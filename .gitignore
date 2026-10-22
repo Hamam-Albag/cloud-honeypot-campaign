@@ -1,0 +1,9 @@
+# Never commit keys or secrets
+*.pem
+*.key
+*.ppk
+private/
+.env
+
+# Raw exports that may contain your own IPs - review before committing
+data/raw/
