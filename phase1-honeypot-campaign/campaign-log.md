@@ -75,8 +75,36 @@ Azure went live on 21 Oct in the afternoon and this check in was about 21 hours 
 - DoublePulsar showed up 1,379 times. That's the NSA backdoor that leaked in 2017 and got used with WannaCry, so bots are still checking for it about 9 years later.
 - 1,638 hits came from IPs already on the DShield blocklist, so a lot of this traffic is from known bad sources.
 - Some usernames stood out like claude and openclaw. Looks like bots are now trying names linked to AI tools and agents. Worth watching since it ties into AI security.
-- Some CVEs are really old (2001 and 2002, RDP and SNMP bugs) and some are from 2025 (CVE-2025-55182 and CVE-2025-29927, both in JavaScript web frameworks). So bots try old and brand new exploits at the same time. Need to check each CVE on NVD before the write up.
+- Some CVEs are really old (2001 and 2002, RDP and SNMP bugs) and some are from 2025 (CVE-2025-55182 and CVE-2025-29927, both in JavaScript web frameworks). So bots try old and brand new exploits at the same time. Need to check each CVE on NVD before the write up. (Update 23 Oct: the 2001 RDP one is mostly normal RDP connections that a Suricata rule tags with that CVE, see the AWS Day 1 notes.)
+
+### Day 1 (23 Oct 2026, AWS only)
+
+AWS went live on 22 Oct at 10:32 and this check in was about 24 hours later. No downtime this time because swap was set up before going live.
+
+**AWS**
+- Total attacks so far: about 28,000
+- Top honeypots hit: Honeytrap 8k, Dionaea (SMB, FTP, MSSQL and other Windows services) 8k, Sentrypeer (VoIP) 5k, Cowrie (SSH and Telnet) 5k. After that RDPHoneypot 850, Tanner 126, H0neytr4p 109, Adbhoney (Android debug) 74, ConPot 71, Mailoney (email) 68.
+- Top usernames: sa by a long way, then root, admin, user, ubuntu, postgres, oracle. Also azureuser, openclaw, jenkins, kafka, elasticsearch.
+- Top passwords: 123456, a blank password, password, 123, root, 12345678, P@ssw0rd
+- Suricata alerts (top 3): ET EXPLOIT DoublePulsar Backdoor installation communication (5,847), SURICATA STREAM Packet with broken ack (2,871), ET DROP Dshield Block Listed Source group 1 (2,841)
+- Suricata CVEs (top 3): CVE-2001-0540 (686), CVE-2002-0013 (53), CVE-2012-0152 (28)
+- Credit used (US$): US$120 credit, usage updates daily
+
+**Screenshots saved:** screenshots/aws/day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
+
+**Day 1 notes (AWS)**
+- Similar total to Azure (28k vs 32k) but a very different mix. Azure was mostly Cowrie (SSH) and AWS is spread across Honeytrap, Dionaea, Sentrypeer and Cowrie.
+- Top username on AWS is sa, which is the default admin account for Microsoft SQL Server. Azure's was root. So AWS got a lot more database brute forcing.
+- DoublePulsar was 5,847 on AWS vs 1,379 on Azure. That lines up with Dionaea (which runs the fake SMB service) being way busier on AWS.
+- Bots tried azureuser on my AWS server. That's Azure's default username, so the bots just use one big list of cloud default usernames everywhere.
+- CVE-2001-0540 is exactly 686, the same as the three RDP connection alerts. So it's not really people using a 2001 exploit. Some Suricata rules for normal RDP connections have that CVE tagged on them. A CVE showing up in the table doesn't always mean the exploit was used, you have to check what rule fired.
+- New CVEs on AWS like CVE-2018-13379 (Fortinet VPN), CVE-2018-10562 (GPON home routers) and CVE-2021-35394 (Realtek router chips). These are the kind botnets like Mirai use to grab routers and IoT devices. Need to confirm each on NVD.
+- 544 alerts were ET INFO Reserved Internal IP Traffic, which is my own VPC traffic again, not attacks.
+- Careful comparing these to Azure Day 1. Different dates and Azure was down for about 7 hours. For a fair comparison I need Azure's numbers for the exact same window (22 Oct 10:32 to 23 Oct 10:32).
 
 ## Ideas / questions to look into for the write-up
 
--
+- Always compare Azure and AWS over the exact same time window, not their own Day 1s.
+- Why does AWS get so much more SMB and database traffic? Maybe AWS IP ranges are on different scan lists.
+- Check which Suricata rules carry CVE tags so I don't count normal traffic as exploit attempts.
+- Build a Kibana table of the top payload hashes and decode the top 5.
