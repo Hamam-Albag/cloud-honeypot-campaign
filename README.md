@@ -58,6 +58,20 @@ After the first day on Azure (about 32,000 attacks):
 - Some bots tried usernames like claude and openclaw, which looks like they're going after AI tools now.
 - Not every log is an attack. The first entries after going live were my own VMs talking to their cloud's internal services, so part of the job is filtering that out.
 
+### First same window comparison (22 Oct 10:32 to 23 Oct 10:32)
+
+| | Azure | AWS |
+| --- | --- | --- |
+| Total attacks in 24 hours | about 114,000 | about 28,000 |
+| Busiest honeypot | Sentrypeer (VoIP) 51k | Honeytrap and Dionaea 8k each |
+| Top username | root | sa (SQL Server admin) |
+| RDP connection requests | 1,527 | 686 |
+| DoublePulsar alerts | under 674 | 5,847 |
+
+Early pattern from one day: Azure gets a lot more Windows Remote Desktop attacks and AWS gets a lot more SMB and database attacks. I'll check if it holds over the rest of the month.
+
+One thing I learned: a CVE showing up in Suricata doesn't mean that exploit was used. CVE-2001-0540 matched a normal RDP connection alert exactly on both clouds, so it was just one rule tagging normal traffic with an old CVE.
+
 More detail is in the [campaign log](phase1-honeypot-campaign/campaign-log.md).
 
 ## Problems I've hit so far

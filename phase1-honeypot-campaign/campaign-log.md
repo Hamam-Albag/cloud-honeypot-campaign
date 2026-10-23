@@ -102,6 +102,33 @@ AWS went live on 22 Oct at 10:32 and this check in was about 24 hours later. No 
 - 544 alerts were ET INFO Reserved Internal IP Traffic, which is my own VPC traffic again, not attacks.
 - Careful comparing these to Azure Day 1. Different dates and Azure was down for about 7 hours. For a fair comparison I need Azure's numbers for the exact same window (22 Oct 10:32 to 23 Oct 10:32).
 
+### Same window comparison 1 (22 Oct 10:32 to 23 Oct 10:32 AEDT)
+
+First proper side by side. Both dashboards set to the exact same 24 hours in Kibana. The screenshots have the window written on top of them.
+
+| | Azure | AWS |
+| --- | --- | --- |
+| Total attacks | about 114,000 | about 28,000 |
+| Sentrypeer (VoIP) | 51k | 5k |
+| Cowrie (SSH and Telnet) | 32k | 5k |
+| Honeytrap (any other port) | 21k | 8k |
+| RDPHoneypot | 4k | 850 |
+| Dionaea (SMB and databases) | 3k | 8k |
+| Top username | root | sa |
+| DoublePulsar alerts | not in the top 10 (under 674) | 5,847 |
+| RDP connection request alerts | 1,527 | 686 |
+| CVE-2001-0540 count | 1,521 | 686 |
+
+**Screenshots:** screenshots/azure/day2-*.png and screenshots/aws/day1-*.png
+
+**Notes**
+- Azure got about 4 times more attacks in the same 24 hours. Almost half of Azure's was Sentrypeer (51k), so I need to check if that's one noisy scanner. Kibana Discover, type : "Sentrypeer", then look at the top src_ip.
+- Azure gets way more RDP (Windows Remote Desktop) traffic. RDP connection requests were 1,527 vs 686 and only Azure had ET HUNTING RDP Authentication Bypass Attempt (674) and ET SCAN MS Terminal Server Traffic on Non-standard Port (1,315) in its top 10. My guess is attackers expect Microsoft's cloud to be full of Windows servers.
+- AWS gets more SMB and database attacks. Dionaea is about 3% of Azure's traffic but about 29% of AWS's, AWS had way more DoublePulsar, and its top username is sa (SQL Server).
+- The CVE-2001-0540 count matches the GPL INFO MS Remote Desktop Request RDP alert exactly on both clouds (1,521 on Azure, 686 on AWS). So that CVE is really just normal RDP connections being tagged by one rule. Same pattern on both clouds so I'm confident about this one.
+- On Azure, enable, system and linuxshell showed up as usernames and passwords, plus GPL TELNET Bad Login (752). These look like Mirai style botnets that log into routers over Telnet and then send those commands to break out into a real Linux shell. So some of this is bots hunting for routers and IoT devices.
+- Only one day so far. Need a few more windows before calling anything a real difference.
+
 ## Ideas / questions to look into for the write-up
 
 - Always compare Azure and AWS over the exact same time window, not their own Day 1s.
