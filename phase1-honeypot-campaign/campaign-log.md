@@ -40,7 +40,6 @@ Copy this block for every check in (every 2 or 3 days).
 - Top 3 source countries:
 - Top 3 usernames / passwords tried:
 - Anything new or odd:
-- Credit used (US$):
 
 **AWS**
 - Total attacks so far:
@@ -48,7 +47,6 @@ Copy this block for every check in (every 2 or 3 days).
 - Top 3 source countries:
 - Top 3 usernames / passwords tried:
 - Anything new or odd:
-- Credit used (US$):
 
 **Screenshots saved:** (list file names)
 
@@ -65,7 +63,6 @@ Azure went live on 21 Oct in the afternoon and this check in was about 21 hours 
 - Suricata alerts (top 3): ET INFO HTTP Request on Unusual Port (1,915), ET DROP Dshield Block Listed Source group 1 (1,638), ET EXPLOIT DoublePulsar Backdoor installation communication (1,379)
 - Suricata CVEs (top 3): CVE-2001-0540 (140), CVE-2012-0152 (73), CVE-2002-0013 (46)
 - Anything new or odd: see the notes below
-- Credit used (US$):
 
 **Screenshots saved:** screenshots/azure/day1-attacks-by-country-port.png, day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
 
@@ -88,7 +85,6 @@ AWS went live on 22 Oct at 10:32 and this check in was about 24 hours later. No 
 - Top passwords: 123456, a blank password, password, 123, root, 12345678, P@ssw0rd
 - Suricata alerts (top 3): ET EXPLOIT DoublePulsar Backdoor installation communication (5,847), SURICATA STREAM Packet with broken ack (2,871), ET DROP Dshield Block Listed Source group 1 (2,841)
 - Suricata CVEs (top 3): CVE-2001-0540 (686), CVE-2002-0013 (53), CVE-2012-0152 (28)
-- Credit used (US$): US$120 credit, usage updates daily
 
 **Screenshots saved:** screenshots/aws/day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
 
