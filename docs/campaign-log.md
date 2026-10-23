@@ -64,7 +64,7 @@ Azure went live on 21 Oct in the afternoon and this check in was about 21 hours 
 - Suricata CVEs (top 3): CVE-2001-0540 (140), CVE-2012-0152 (73), CVE-2002-0013 (46)
 - Anything new or odd: see the notes below
 
-**Screenshots saved:** screenshots/azure/day1-attacks-by-country-port.png, day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
+**Screenshots saved:** ../screenshots/azure/day1-attacks-by-country-port.png, day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
 
 **Day 1 notes**
 - 32k attacks in under a day on a brand new IP that nobody knew about. It's all automated bots scanning the whole internet, not people picking me out.
@@ -86,7 +86,7 @@ AWS went live on 22 Oct at 10:32 and this check in was about 24 hours later. No 
 - Suricata alerts (top 3): ET EXPLOIT DoublePulsar Backdoor installation communication (5,847), SURICATA STREAM Packet with broken ack (2,871), ET DROP Dshield Block Listed Source group 1 (2,841)
 - Suricata CVEs (top 3): CVE-2001-0540 (686), CVE-2002-0013 (53), CVE-2012-0152 (28)
 
-**Screenshots saved:** screenshots/aws/day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
+**Screenshots saved:** ../screenshots/aws/day1-honeypot-attack-counts.png, day1-username-password-tagclouds.png, day1-suricata-alerts-top10.png, day1-suricata-cve-top10.png
 
 **Day 1 notes (AWS)**
 - Similar total to Azure (28k vs 32k) but a very different mix. Azure was mostly Cowrie (SSH) and AWS is spread across Honeytrap, Dionaea, Sentrypeer and Cowrie.
@@ -115,7 +115,7 @@ First proper side by side. Both dashboards set to the exact same 24 hours in Kib
 | RDP connection request alerts | 1,527 | 686 |
 | CVE-2001-0540 count | 1,521 | 686 |
 
-**Screenshots:** screenshots/azure/day2-*.png and screenshots/aws/day1-*.png
+**Screenshots:** ../screenshots/azure/day2-*.png and ../screenshots/aws/day1-*.png
 
 **Notes**
 - Azure got about 4 times more attacks in the same 24 hours. Almost half of Azure's was Sentrypeer (51k), so I need to check if that's one noisy scanner. Kibana Discover, type : "Sentrypeer", then look at the top src_ip.

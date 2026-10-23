@@ -1,19 +1,10 @@
-# Homelab: Honeypots, IDS/IPS and a SIEM
+# Honeypot Campaign: Azure vs AWS
 
-This is my first cybersecurity project as a Bachelor of Cybersecurity student at UTS. I'm building a small version of what a Security Operations Centre (SOC) runs. Attackers hit decoy servers in the cloud, I collect what they do, then I analyse it and write detections.
+This is my first cybersecurity project as a Bachelor of Cybersecurity student at UTS. I'm running decoy servers (honeypots) on Azure and AWS for a month to see what attacks hit each cloud, then analysing what the attackers do. It's a small version of what a Security Operations Centre (SOC) does every day.
 
-**Status:** Phase 1 running. Azure went live 21 Oct 2026 and AWS went live 22 Oct 2026. Both run until 21 Nov 2026.
+**Status:** Running. Azure went live 21 Oct 2026 and AWS went live 22 Oct 2026. Both run until 21 Nov 2026.
 
-## Phases
-
-| Phase | What | Status |
-| --- | --- | --- |
-| 1 | Honeypot campaign on Azure and AWS, compare what attacks each cloud gets | Running |
-| 2 | Home lab on my PC in VMware with OPNsense + Suricata (IDS/IPS) and Wazuh (SIEM) | Planned |
-| 3 | Long running honeypot feeding logs into Wazuh | Planned |
-| 4 | Using machine learning and LLMs on the attack data | Planned |
-
-## Phase 1 setup
+## Setup
 
 I'm running two identical T-Pot honeypots at the same time so the comparison is fair.
 
@@ -37,9 +28,9 @@ The main question I want to answer is whether attackers treat Azure and AWS IP r
 
 ## What's in here
 
-- `phase1-honeypot-campaign/campaign-log.md` is my running log with check ins every few days
-- `phase1-honeypot-campaign/screenshots/` has dashboard screenshots (IPs blurred)
-- `phase1-honeypot-campaign/data/` will have the exported results once the campaign ends
+- `docs/campaign-log.md` is my running log with check ins every few days
+- `screenshots/` has dashboard screenshots for each cloud, with the time window written on top
+- `data/` will have the exported results once the campaign ends
 
 ## Early findings
 
@@ -72,12 +63,12 @@ Early pattern from one day: Azure gets a lot more Windows Remote Desktop attacks
 
 One thing I learned: a CVE showing up in Suricata doesn't mean that exploit was used. CVE-2001-0540 matched a normal RDP connection alert exactly on both clouds, so it was just one rule tagging normal traffic with an old CVE.
 
-More detail is in the [campaign log](phase1-honeypot-campaign/campaign-log.md).
+More detail is in the [campaign log](docs/campaign-log.md).
 
 ## Problems I've hit so far
 
 - On day 1 the Azure VM ran out of memory about an hour after T-Pot started and froze. I found it with Azure Monitor (CPU credits were fine, available memory dropped to almost zero) and fixed it by adding 4 GB of swap. I did the same on AWS before going live.
 
-## Tools
+## Skills and tools
 
 T-Pot, Cowrie, Dionaea, Suricata, Elasticsearch, Kibana, Azure, AWS EC2, Debian Linux
