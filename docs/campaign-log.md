@@ -27,6 +27,7 @@ Keep public IPs, passwords and keys OUT of this file if it goes on GitHub.
 - 22 Oct: Set up AWS and added the same 4 GB swap before going live. First AWS security group had TCP 1 to 64000 twice instead of TCP and UDP, fixed it before going live.
 - 22 Oct: AWS credit showed US$120 remaining, so US$20 of the bonus credit was already earned. Azure credit is in the Education hub, not the sponsorships site. Azure shows A$142 credit (about US$100) and A$2.72 used so far in October.
 - 22 Oct: The first logs after go live weren't attacks. On Azure it was the VM talking to 168.63.129.16 (Azure's own platform service) and on AWS it was DNS to 172.31.0.2 (the VPC resolver) plus outbound traffic. Have to filter out my own infrastructure's traffic to find the real first attack.
+- 24 Oct: Noticed Network Out on Azure drop to zero and all containers showing Up 4 hours. Found the cause in the crontab: T-Pot reboots itself every day at 02:45 UTC (13:45 Sydney time). It stops T-Pot, cleans up old Docker containers, images and volumes, then reboots. So there's a gap of a few minutes in the data every day. AWS has the same job at the same UTC time so the gaps line up and the comparison stays fair.
 
 ## Check-ins
 
@@ -125,9 +126,38 @@ First proper side by side. Both dashboards set to the exact same 24 hours in Kib
 - On Azure, enable, system and linuxshell showed up as usernames and passwords, plus GPL TELNET Bad Login (752). These look like Mirai style botnets that log into routers over Telnet and then send those commands to break out into a real Linux shell. So some of this is bots hunting for routers and IoT devices.
 - Only one day so far. Need a few more windows before calling anything a real difference.
 
+### Day 3 (24 Oct 2026, Azure)
+
+Kibana range: Azure's first 3 days exactly, 21 Oct 16:21 to 24 Oct 16:21 AEDT. The range is written on top of each screenshot. AWS will get the same 3 day window from its go live (22 Oct 10:32 to 25 Oct 10:32). Elasticsearch was slow to load at first but the VM was healthy.
+
+**Azure**
+- Total attacks in the first 3 days: about 301,000 (roughly 100k a day)
+- Top honeypots hit: Sentrypeer (VoIP) 151k, Cowrie 63k, Honeytrap 51k, Dionaea 14k, RDPHoneypot 13k, Tanner 4k, Heralding 1k, H0neytr4p 1k, ConPot 846, Redishoneypot 640
+- Top countries: United States, Germany, Bangladesh (all almost only port 5060, SIP), Bulgaria (almost only port 22, SSH), China (mostly 5060)
+- Top usernames: root, sa, admin, user, enable, system, manager. Still seeing azureuser, openclaw and claude.
+- Top passwords: a blank password, 123456, linuxshell, password, 1234, 12345678
+- Top attacker networks (AS): 31173 Services AB 46,152, Banatsync Srl 41,240, Google LLC 24,135, CyberForest 13,185 and 10,224, Alsycon 11,302, HostPapa 11,078
+- Top source IP: 185.213.155.228 with 44,560 (about 15% of everything)
+- Suricata alerts (top 3): ET INFO RDP Response To External Host (11,512), ET INFO RDP connection request (8,424), GPL INFO MS Remote Desktop Request RDP (8,410)
+- Suricata CVEs (top 3): CVE-2001-0540 (8,412), CVE-2006-2369 (1,110), CVE-2012-0152 (332)
+
+**Screenshots saved:** ../screenshots/azure/day3-honeypot-attack-counts.png, day3-honeypot-attacks-bar.png, day3-attacks-by-country-port.png, day3-username-password-tagclouds.png, day3-asn-ip-cve-alerts-top10.png
+
+**Day 3 notes**
+- Half of everything is Sentrypeer on port 5060 (SIP, the protocol VoIP phones use). Bots scan for phone systems so they can make calls through them for free or for scams.
+- One IP, 185.213.155.228, sent 44,560 hits. Its whole network (AS 39351) only has 46,152, so it's basically all that one IP. Need to check in Discover which honeypot it hit, my guess is Sentrypeer.
+- Five IPs next to each other (109.160.32.107, .108, .114, .130, .131) each sent almost exactly 6,000 hits. Same network and same amount, so it's probably one operator or botnet spreading the work over several IPs.
+- The 8,400ish for CVE-2001-0540 matches the RDP connection alerts again (8,412 vs 8,410 vs 8,424). That's normal RDP connections being tagged with an old CVE, not a 2001 exploit being used.
+- ET INFO RDP Response To External Host (11,512) is my RDPHoneypot replying to attackers, not attacks on their own.
+- Most attacks come from hosting companies and cloud providers (Google LLC, HostPapa, CyberForest) and scanning companies like Modat. Country tells you where the server is, not who the attacker is.
+- New CVEs: CVE-2022-27255 (259), a Realtek router bug in how routers handle SIP. So some of the 5060 traffic is bots trying to hack routers through VoIP. CVE-2006-2369 (1,110) is a RealVNC login bypass and GPL INFO VNC server response (2,744) showed up too, so bots are hunting VNC as well as RDP. Need to confirm both on NVD.
+- New honeypot in the top 10: Heralding, which catches logins for things like FTP, POP3, IMAP and VNC.
+
 ## Ideas / questions to look into for the write-up
 
 - Always compare Azure and AWS over the exact same time window, not their own Day 1s.
 - Why does AWS get so much more SMB and database traffic? Maybe AWS IP ranges are on different scan lists.
 - Check which Suricata rules carry CVE tags so I don't count normal traffic as exploit attempts.
 - Build a Kibana table of the top payload hashes and decode the top 5.
+- Check which honeypot 185.213.155.228 hit, and whether the 109.160.32.x IPs all hit the same thing.
+- Compare top attacker networks (AS) between Azure and AWS.
