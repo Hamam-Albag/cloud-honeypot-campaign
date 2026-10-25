@@ -231,6 +231,11 @@ Azure: 21 Oct 16:21 to 24 Oct 16:21. AWS: 22 Oct 10:32 to 25 Oct 10:33. Not the 
 - docker inspect showed ewsposter had restarted 32 times since that morning's reboot. It's the container that sends my data to T-Pot's community threat map.
 - It doesn't store my own data so it didn't cause anything to go missing, but it's broken. Need to check docker logs --tail 20 ewsposter.
 
+### 5. What was 23.94.174.242 doing? (top attacker on AWS, also in Azure's top 10)
+- On AWS all its traffic went to Sentrypeer on port 5060, same as the VPN IP on Azure.
+- The called_number was 461, a short internal extension number, not an outside phone number. So it was guessing extension numbers to find real phone accounts on my fake phone system.
+- That's a different step to the VPN IP. VoIP attacks go: find extensions, crack their passwords, then use them to make fraud calls. This IP was doing step 1 and the VPN IP on Azure was testing dial out prefixes for step 3.
+
 ### Note on AWS monitoring
 - EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
 
@@ -241,6 +246,6 @@ Azure: 21 Oct 16:21 to 24 Oct 16:21. AWS: 22 Oct 10:32 to 25 Oct 10:33. Not the 
 - Check which Suricata rules carry CVE tags so I don't count normal traffic as exploit attempts.
 - Build a Kibana table of the top payload hashes and decode the top 5.
 - Check whether the 109.160.32.x IPs all hit the same honeypot.
-- Check which honeypot 23.94.174.242 hit on each cloud.
+- Check which honeypot 23.94.174.242 hit on Azure (on AWS it was Sentrypeer).
 - Find out why ewsposter keeps restarting on AWS.
 - Compare top attacker networks (AS) between Azure and AWS.
