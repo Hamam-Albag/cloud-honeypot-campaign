@@ -27,7 +27,7 @@ Keep public IPs, passwords and keys OUT of this file if it goes on GitHub.
 - 22 Oct: Set up AWS and added the same 4 GB swap before going live. First AWS security group had TCP 1 to 64000 twice instead of TCP and UDP, fixed it before going live.
 - 22 Oct: AWS credit showed US$120 remaining, so US$20 of the bonus credit was already earned. Azure credit is in the Education hub, not the sponsorships site. Azure shows A$142 credit (about US$100) and A$2.72 used so far in October.
 - 22 Oct: The first logs after go live weren't attacks. On Azure it was the VM talking to 168.63.129.16 (Azure's own platform service) and on AWS it was DNS to 172.31.0.2 (the VPC resolver) plus outbound traffic. Have to filter out my own infrastructure's traffic to find the real first attack.
-- 24 Oct: Noticed Network Out on Azure drop to zero and all containers showing Up 4 hours. Found the cause in the crontab: T-Pot reboots itself every day at 02:45 UTC (13:45 Sydney time). It stops T-Pot, cleans up old Docker containers, images and volumes, then reboots. So there's a gap of a few minutes in the data every day. AWS has the same job at the same UTC time so the gaps line up and the comparison stays fair.
+- 24 Oct: Noticed Network Out on Azure drop to zero and all containers showing Up 4 hours. Found the cause in the crontab: T-Pot reboots itself every day at 02:45 UTC (13:45 Sydney time). It stops T-Pot, cleans up old Docker containers, images and volumes, then reboots. So there's a gap of a few minutes in the data every day. AWS has the same job but its boot history shows it reboots at about 04:51 UTC (15:51 Sydney), not 02:45 like Azure. So the gaps don't line up exactly, but each one is only a few minutes.
 
 ## Check-ins
 
@@ -153,11 +153,94 @@ Kibana range: Azure's first 3 days exactly, 21 Oct 16:21 to 24 Oct 16:21 AEDT. T
 - New CVEs: CVE-2022-27255 (259), a Realtek router bug in how routers handle SIP. So some of the 5060 traffic is bots trying to hack routers through VoIP. CVE-2006-2369 (1,110) is a RealVNC login bypass and GPL INFO VNC server response (2,744) showed up too, so bots are hunting VNC as well as RDP. Need to confirm both on NVD.
 - New honeypot in the top 10: Heralding, which catches logins for things like FTP, POP3, IMAP and VNC.
 
+### Day 3 (25 Oct 2026, AWS)
+
+Kibana range: AWS's first 3 days exactly, 22 Oct 10:32 to 25 Oct 10:33 AEDT. The range is written on top of each screenshot.
+
+**AWS**
+- Total attacks in the first 3 days: about 82,000
+- Top honeypots hit: Sentrypeer 32k, Honeytrap 21k, Dionaea 15k, Cowrie 7k, RDPHoneypot 3k, Heralding 1k, Tanner 843, ConPot 518, H0neytr4p 431, Ciscoasa 208
+- Top countries: United States (almost all 5060), China (mostly 445, SMB), Germany (5060 and 22), The Netherlands (mostly 5060), Indonesia (almost all 445)
+- Top usernames: sa, admin, root. Also socks, socks5, proxy, 1080, anonymous, azureuser, openclaw
+- Top passwords: a blank password, 123456, password, proxy, socks
+- Top attacker networks (AS): HostPapa 21,963, Banatsync Srl 4,789, Google LLC 4,751, China Mobile 3,786, Chinanet 3,635, Telekomunikasi Indonesia 3,145, ONYPHE 3,082, Microsoft Corporation 3,058
+- Top source IP: 23.94.174.242 with 21,962
+- Suricata alerts (top 3): ET EXPLOIT DoublePulsar Backdoor installation communication (12,090), ET DROP Dshield Block Listed Source group 1 (8,188), SURICATA STREAM Packet with broken ack (6,120)
+- Suricata CVEs (top 3): CVE-2001-0540 (2,603), CVE-2022-27255 (574), CVE-2002-0013 (210)
+
+**Screenshots saved:** ../screenshots/aws/day3-honeypot-attack-counts.png, day3-username-password-tagclouds.png, day3-asn-ip-cve-alerts-top10.png, day3-attacks-by-country-port.png, day3-ip-reputation-and-honeypot-share.png
+
+**Day 3 notes (AWS)**
+- HostPapa's whole count (21,963) is basically one IP, 23.94.174.242 (21,962). Same thing as the big VPN IP on Azure. One noisy source can make a whole network look bad.
+- 23.94.174.242 is also in Azure's top 10 (11,064). So the same attacker is hitting both clouds. 77.239.124.x shows up on both too (77.239.124.44 on Azure, 77.239.124.205 on AWS).
+- Three IPs (115.150.176.231, 182.9.1.55, 39.155.8.176) each sent about 3,145. Different countries but the same amount, so probably one botnet splitting the work.
+- Lots of proxy hunting. Usernames like socks, socks5, proxy and 1080 (the SOCKS port) plus GPL INFO SOCKS Proxy attempt (1,346). Bots want an open proxy to hide behind, same idea as the CONNECT request on AWS day 1.
+- Some usernames are really other protocols, like GET / HTTP/1.1 and OPTIONS rtsp://example.com RTSP/1.0 (RTSP is what IP cameras use). Bots throw web and camera requests at any open port and the honeypot logs whatever comes in as a login.
+- One password was a web request header with my own AWS IP in it (a bot sent HTTP to my Telnet port). I covered it in the screenshot before committing.
+- Microsoft Corporation (3,058) is in AWS's top attacker networks. So attacks come from inside Azure as well, attackers rent cloud servers like anyone else.
+- The CVE-2001-0540 count (2,603) matches the RDP alerts (2,603) again. Third time this pattern held.
+
+### Comparison: first 3 days on each cloud
+
+Azure: 21 Oct 16:21 to 24 Oct 16:21. AWS: 22 Oct 10:32 to 25 Oct 10:33. Not the exact same hours (they overlap for about 54 of the 72) but both are each cloud's first 3 days.
+
+| | Azure | AWS |
+| --- | --- | --- |
+| Total attacks | about 301,000 | about 82,000 |
+| Sentrypeer (VoIP) | 151k (50%) | 32k (39%) |
+| Cowrie (SSH and Telnet) | 63k (21%) | 7k (9%) |
+| Honeytrap (any other port) | 51k (17%) | 21k (26%) |
+| Dionaea (SMB and databases) | 14k (5%) | 15k (18%) |
+| RDPHoneypot | 13k (4%) | 3k (4%) |
+| Top username | root and sa | sa and admin |
+| Top source IP | 185.213.155.228 (44,560, a VPN in Germany) | 23.94.174.242 (21,962, HostPapa) |
+| DoublePulsar alerts | 6,340 | 12,090 |
+| RDP connection request alerts | 8,424 | 2,603 |
+| CVE-2022-27255 (Realtek SIP) | 259 | 574 |
+
+**What it shows so far**
+- Azure got about 3.7 times more attacks. A lot of that is one VPN IP doing SIP scanning, but Azure is still ahead without it.
+- Azure is SSH heavy. Cowrie is 21% of Azure's traffic but only 9% of AWS's.
+- AWS is SMB heavy. Dionaea is 18% of AWS's traffic but only 5% of Azure's, and AWS had about double the DoublePulsar alerts even with way less traffic overall.
+- RDP is about the same share on both (4%). Azure just gets more of everything. So my day 2 idea that Azure gets more RDP is really about volume, not share.
+- Some attackers hit both clouds (23.94.174.242 and the 77.239.124.x range).
+
+## Investigations
+
+### 1. Azure Network Out dropped to zero (24 Oct)
+- Saw Network Out drop to zero in Azure Monitor and every container showing Up 4 hours.
+- uptime showed the VM booted about 4 hours earlier. The crontab had an entry called T-Pot Daily Reboot set for 02:45 UTC every day.
+- It stops T-Pot, prunes old Docker containers, images and volumes, then reboots. Attack data lives in ~/tpotce/data so nothing is lost, just a few minutes gap every day.
+- Result: not a problem, it's T-Pot's daily refresh.
+
+### 2. Who is 185.213.155.228? (Azure's top attacker)
+- Cisco Talos says it's in Frankfurt, owned by 31173 Services AB, category Personal VPN. Reputation Neutral and not on any blocklist.
+- So the real attacker is hiding behind a VPN. Blocklists don't list VPN exits because thousands of normal people share them, so reputation tools miss this kind of thing.
+- In Kibana all its traffic went to Sentrypeer on port 5060. The called_number field showed the same North American number with different prefixes in front (9, 00, 000). That's a toll fraud scan, it's trying to find which dial out prefix my fake phone system accepts so it can push calls to premium numbers.
+- One Suricata flow record lasted 8 hours 27 minutes with 29,953 SIP requests, about one a second, all from the same source port. Every request got a reply so the bot kept going.
+- The flow started at 02:49:55 UTC, about 3 minutes after Azure's daily reboot. So it was hitting my IP the whole time and came straight back when the honeypot came back up.
+- flow.alerted was false. Suricata didn't raise a single alert for 8 hours of toll fraud scanning. The honeypot is the only reason I saw it. Writing a Suricata rule for this could be my first custom detection in phase 2.
+
+### 3. AWS looked like it was missing data (25 Oct)
+- AWS's dashboard showed only 23k for 3 days even though day 1 alone was 28k.
+- Checked the VM before blaming the data. uptime, journalctl --list-boots, memory, disk and container status were all fine and there were no out of memory messages.
+- The boot history showed AWS reboots every day at about 04:51 UTC (15:51 Sydney), not 02:45 like Azure.
+- In the end the Kibana time range was wrong. With the right absolute range it showed 82k. Lesson: check the time picker first on every check in.
+
+### 4. ewsposter keeps restarting on AWS
+- docker inspect showed ewsposter had restarted 32 times since that morning's reboot. It's the container that sends my data to T-Pot's community threat map.
+- It doesn't store my own data so it didn't cause anything to go missing, but it's broken. Need to check docker logs --tail 20 ewsposter.
+
+### Note on AWS monitoring
+- EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
+
 ## Ideas / questions to look into for the write-up
 
 - Always compare Azure and AWS over the exact same time window, not their own Day 1s.
 - Why does AWS get so much more SMB and database traffic? Maybe AWS IP ranges are on different scan lists.
 - Check which Suricata rules carry CVE tags so I don't count normal traffic as exploit attempts.
 - Build a Kibana table of the top payload hashes and decode the top 5.
-- Check which honeypot 185.213.155.228 hit, and whether the 109.160.32.x IPs all hit the same thing.
+- Check whether the 109.160.32.x IPs all hit the same honeypot.
+- Check which honeypot 23.94.174.242 hit on each cloud.
+- Find out why ewsposter keeps restarting on AWS.
 - Compare top attacker networks (AS) between Azure and AWS.

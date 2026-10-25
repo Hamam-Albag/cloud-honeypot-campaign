@@ -63,11 +63,30 @@ Early pattern from one day: Azure gets a lot more Windows Remote Desktop attacks
 
 One thing I learned: a CVE showing up in Suricata doesn't mean that exploit was used. CVE-2001-0540 matched a normal RDP connection alert exactly on both clouds, so it was just one rule tagging normal traffic with an old CVE.
 
+### First 3 days on each cloud
+
+| | Azure | AWS |
+| --- | --- | --- |
+| Total attacks | about 301,000 | about 82,000 |
+| Share that was SSH (Cowrie) | 21% | 9% |
+| Share that was SMB and databases (Dionaea) | 5% | 18% |
+| DoublePulsar alerts | 6,340 | 12,090 |
+| Top source IP | a VPN exit in Germany doing VoIP toll fraud scans (44,560 hits) | one HostPapa server (21,962 hits) |
+
+The pattern from day 2 held. Azure gets way more traffic overall and is SSH heavy, AWS is SMB heavy. Some attackers hit both clouds, the same HostPapa IP is in both top 10 lists.
+
+### Things I investigated
+
+- **Azure's top attacker** was a VPN exit IP with a clean reputation. It sent about one VoIP request a second for over 8 hours, trying different dial out prefixes on the same phone number. That's a toll fraud scan. Suricata didn't alert on any of it, only the honeypot caught it.
+- **A network traffic drop to zero** turned out to be T-Pot's built in daily reboot. Found it through uptime and the crontab.
+- **AWS looked like it lost data.** I checked boots, memory, disk and containers before finding the real cause, a wrong time range in Kibana.
+
 More detail is in the [campaign log](docs/campaign-log.md).
 
 ## Problems I've hit so far
 
 - On day 1 the Azure VM ran out of memory about an hour after T-Pot started and froze. I found it with Azure Monitor (CPU credits were fine, available memory dropped to almost zero) and fixed it by adding 4 GB of swap. I did the same on AWS before going live.
+- On day 3 I found ewsposter (the container that shares data with T-Pot's community threat map) crash looping on AWS. Still looking into it.
 
 ## Skills and tools
 
