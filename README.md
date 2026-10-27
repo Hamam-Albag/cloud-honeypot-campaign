@@ -81,6 +81,16 @@ The pattern from day 2 held. Azure gets way more traffic overall and is SSH heav
 - **A network traffic drop to zero** turned out to be T-Pot's built in daily reboot. Found it through uptime and the crontab.
 - **AWS looked like it lost data.** I checked boots, memory, disk and containers before finding the real cause, a wrong time range in Kibana.
 
+### Incident: my honeypot was used in a DDoS
+
+On 26 Oct, ConPot (which pretends to be industrial equipment) started getting hundreds of thousands of SNMP requests. The traffic was 100% UDP to port 161 from home and business internet connections. One flow lasted 18.7 hours and my VM sent out about twice the bytes it received, with each reply about 14 times bigger than the request.
+
+That's an SNMP reflection attack. Attackers fake the victim's IP as the sender, my honeypot sends its bigger replies to the victim, and the victim gets flooded. I blocked UDP 161 on both clouds on 27 Oct. Looking back at the timestamps the flood had actually stopped by itself about 35 minutes before the block, so the block is there to stop it happening again. The lesson is that a honeypot can hurt other people if you only watch what comes in and not what goes out.
+
+### After 6 days on Azure
+
+About 754,000 attacks. Other things found: a full range port scan from Kazakhstan that touched almost every port from 0 to 65535 in about 9 hours, and almost every attacking machine fingerprinted as Linux.
+
 More detail is in the [campaign log](docs/campaign-log.md).
 
 ## Problems I've hit so far

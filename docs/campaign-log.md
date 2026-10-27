@@ -205,6 +205,34 @@ Azure: 21 Oct 16:21 to 24 Oct 16:21. AWS: 22 Oct 10:32 to 25 Oct 10:33. Not the 
 - RDP is about the same share on both (4%). Azure just gets more of everything. So my day 2 idea that Azure gets more RDP is really about volume, not share.
 - Some attackers hit both clouds (23.94.174.242 and the 77.239.124.x range).
 
+### Days 3 to 6 (27 Oct 2026, Azure)
+
+Two Kibana ranges this time, both written on top of the screenshots:
+- Days 3 to 6: 23 Oct 16:32 to 27 Oct 16:33 AEDT
+- Days 1 to 6 (everything so far): 20 Oct 16:30 to 27 Oct 16:33 AEDT
+
+**Azure, days 3 to 6**
+- Total attacks: about 575,000
+- Top honeypots hit: Sentrypeer 207k, Honeytrap 129k, Cowrie 119k, ConPot 42k, Dionaea 39k, RDPHoneypot 29k
+- Top source IPs: 185.136.15.17 (62,978), 172.110.223.9 (31,904), 141.153.237.4 (25,178), 185.213.155.228 (20,290), 23.94.174.242 (15,615)
+- Top attacker networks (AS): Banatsync Srl 87,855, AO ALMAZ 74,659, Husam A. H. Hijazi 42,002, Google LLC 33,388, Verizon Business 25,302
+- Suricata alerts (top 3): GPL SNMP request udp (510,437), GPL SNMP public access udp (510,379), SURICATA STREAM Packet with invalid timestamp (63,005)
+- Suricata CVEs (top 3): CVE-2002-0013 (1,020,869), CVE-2001-0540 (24,543), CVE-2005-4050 (1,952)
+
+**Azure, days 1 to 6**
+- Total attacks: about 754,000
+- Top honeypots hit: Sentrypeer 290k, Honeytrap 165k, Cowrie 163k, Dionaea 45k, ConPot 43k, RDPHoneypot 34k
+- Top countries: United States, Bulgaria, Germany, Kazakhstan, Philippines
+- P0f (passive OS fingerprinting) says almost every attacking machine runs Linux, very little Windows. Makes sense since bots run on rented Linux servers and hacked Linux IoT devices.
+
+**Screenshots saved:** ../screenshots/azure/days3-6-*.png, ../screenshots/azure/days1-6-*.png, ../screenshots/investigations/*.png
+
+**Notes**
+- ConPot jumped from 846 in the first 3 days to 42k in days 3 to 6. That led to investigation 7.
+- CVE-2002-0013 (1,020,869) is almost exactly the two SNMP alerts added together (510,437 + 510,379). Fourth time a CVE tag has turned out to sit on a normal rule.
+- SURICATA STREAM Packet with invalid timestamp (63,005) almost matches 185.136.15.17's count (62,978). That led to investigation 6.
+- 185.213.155.228 (the VPN toll fraud IP) isn't still going. Its histogram only shows 23 Oct to early 24 Oct and its 6 day total (44,560) is the same as its 3 day total. A total doesn't tell you if something is ongoing, the histogram does.
+
 ## Investigations
 
 ### 1. Azure Network Out dropped to zero (24 Oct)
@@ -236,6 +264,49 @@ Azure: 21 Oct 16:21 to 24 Oct 16:21. AWS: 22 Oct 10:32 to 25 Oct 10:33. Not the 
 - The called_number was 461, a short internal extension number, not an outside phone number. So it was guessing extension numbers to find real phone accounts on my fake phone system.
 - That's a different step to the VPN IP. VoIP attacks go: find extensions, crack their passwords, then use them to make fraud calls. This IP was doing step 1 and the VPN IP on Azure was testing dial out prefixes for step 3.
 
+### 6. 185.136.15.17, a full port scan from Kazakhstan (25 to 26 Oct)
+- Top source IP for days 3 to 6 with 62,978 hits. Network AO ALMAZ (AS 210328, Kazakhstan). Its neighbour 185.136.15.31 sent another 11,470.
+- Almost all of it happened in one burst, about 25 Oct 18:00 to 26 Oct 03:00, 783,539 log entries in about 9 hours.
+- I first thought it was hammering port 45636, but every row was a different port (45636, 63496, 7676, 9301, 6906, 57792, 9383). 45636 is just a random high (ephemeral) port, nothing runs there.
+- Field statistics on DestPort: the busiest single port was 3389 at only 0.4%, and 98.4% was Other. The distribution covers 0 to 65535 and the average port was about 32,400, right in the middle of the range. That's what random ports across the whole range look like.
+- So it's a full range port scan looking for services hidden on unusual ports. Honeytrap answers on every port nothing else uses, so each port it touched counted as an attack.
+- Its count matches SURICATA STREAM Packet with invalid timestamp (63,005). Fast scanners like masscan build their own packets to go quicker and that often leaves odd TCP fields, which is why these flows show flow.alerted true.
+
+### 7. My honeypot was being used in an SNMP reflection DDoS (26 to 27 Oct)
+**What I noticed**
+- ConPot went from 846 to 42k and the top Suricata alerts became GPL SNMP request udp and GPL SNMP public access udp, over 510,000 each.
+- SNMP (UDP port 161) is how admins monitor routers, printers and industrial gear. ConPot pretends to be industrial equipment so it answers SNMP.
+
+**Who it was**
+- In Lens, the top sources for GPL SNMP request udp were 141.153.237.4 (43%), 46.128.202.246 (8%), 86.128.148.49 (7%), 83.81.66.128 (6%), 89.81.25.16 (5%). It started small on 25 Oct, exploded around 26 Oct 03:00 and kept going.
+- These look like home and business internet connections in different countries, not attacker servers. That's what made me suspect spoofing.
+- Side lesson: the Discover sidebar said 89.81.25.16 was 38% but Lens said 4.5%. The sidebar only uses a sample of recent records, Lens counts everything.
+
+**Proving it with 141.153.237.4 (Verizon Business, New Jersey)**
+- 687,427 records, 100% UDP, and the median destination port was 161. No TCP at all. TCP needs a real handshake so it can't be faked, UDP can.
+- One Suricata flow ran from 26 Oct 13:52 to 27 Oct 08:32, about 18.7 hours.
+- In: 167,560 packets and 12.7 MB, about 76 bytes each. Out: 25,189 packets and 26.4 MB, about 1,050 bytes each. Each reply was about 14 times bigger than a request, and my VM sent twice as many bytes out as came in.
+- Azure Network Out was climbing at the time (9.5 MB then 18 MB in single intervals) on top of its normal baseline.
+
+**What was happening**
+- Attackers send small SNMP requests to my honeypot with the source faked as the victim (141.153.237.4 and the others). ConPot sends its much bigger replies to the victim. The attacker does this with lots of exposed devices and the victim gets flooded, while the attacker never shows up in any log. This is a reflection or amplification DDoS.
+- So the IPs in my SNMP charts are most likely the victims, not the attackers.
+
+**What I did**
+- Blocked UDP 161 on both clouds so the comparison stays fair and everything else keeps collecting.
+- AWS, 27 Oct 18:06 AEDT: split the security group's UDP 1 to 64000 rule into UDP 1 to 160 and UDP 162 to 64000, since security groups can't deny.
+- Azure, 27 Oct 18:11 AEDT: added NSG rule Deny-SNMP-reflection, UDP 161, Deny, priority 105 (above Allow-Honeypots at 110).
+
+**Result**
+- Looking at GPL SNMP request udp from 16:30 to 18:25 on 27 Oct, it was about 50 alerts a minute until about 17:34, then dropped to almost nothing at 17:35 with one stray at 17:52 and none after 18:00.
+- Azure Network Out had its big spike and then went back to baseline around the same time.
+- So the flood stopped by itself about 35 minutes before I blocked it. The attackers moved on. My block didn't stop this attack but it means it can't happen again since UDP 161 is now closed on both clouds.
+- Screenshots: ../screenshots/investigations/snmp-alerts-27oct-1630-to-1825.png and snmp-reflection-azure-network-out-after.png
+
+**Lesson**
+- A honeypot can be turned into a weapon against other people if you're not watching it. Running one responsibly means watching outbound traffic too, not just what comes in.
+- Suricata flagged the SNMP requests but only as Informational, and nothing alerted on my own VM's outbound replies. A rule for "my VM is suddenly sending lots of outbound UDP" would be a good detection to write in phase 2.
+
 ### Note on AWS monitoring
 - EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
 
@@ -246,6 +317,8 @@ Azure: 21 Oct 16:21 to 24 Oct 16:21. AWS: 22 Oct 10:32 to 25 Oct 10:33. Not the 
 - Check which Suricata rules carry CVE tags so I don't count normal traffic as exploit attempts.
 - Build a Kibana table of the top payload hashes and decode the top 5.
 - Check whether the 109.160.32.x IPs all hit the same honeypot.
+- Check other UDP services T-Pot exposes for reflection risk (look at top UDP destination ports in Kibana).
+- Check AWS for the same SNMP reflection before the block.
 - Check which honeypot 23.94.174.242 hit on Azure (on AWS it was Sentrypeer).
 - Find out why ewsposter keeps restarting on AWS.
 - Compare top attacker networks (AS) between Azure and AWS.
