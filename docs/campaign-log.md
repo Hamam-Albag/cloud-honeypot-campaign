@@ -233,6 +233,34 @@ Two Kibana ranges this time, both written on top of the screenshots:
 - SURICATA STREAM Packet with invalid timestamp (63,005) almost matches 185.136.15.17's count (62,978). That led to investigation 6.
 - 185.213.155.228 (the VPN toll fraud IP) isn't still going. Its histogram only shows 23 Oct to early 24 Oct and its 6 day total (44,560) is the same as its 3 day total. A total doesn't tell you if something is ongoing, the histogram does.
 
+### Days 3 to 6 and days 1 to 6 (28 Oct 2026, AWS)
+
+Two Kibana ranges, written on top of the screenshots:
+- Days 3 to 6: 24 Oct 10:20 to 28 Oct 10:35 AEDT
+- Days 1 to 6 (everything so far): 22 Oct 10:20 to 28 Oct 10:30 AEDT
+
+**AWS, days 3 to 6**
+- Total attacks: about 248,000
+- Top honeypots hit: Honeytrap 98k, Sentrypeer 70k, Dionaea 52k, RDPHoneypot 18k, Cowrie 5k, Tanner 2k, ConPot 710, Mailoney 692, H0neytr4p 541, Heralding 372
+- That's about 62k a day, more than double AWS's first days (about 28k a day). The port scan alone added about 63k.
+
+**AWS, days 1 to 6**
+- Total attacks: about 306,000
+- Top honeypots hit: Honeytrap 112k, Sentrypeer 90k, Dionaea 67k, RDPHoneypot 19k, Cowrie 11k, Tanner 2k, Heralding 1k, ConPot 919
+- Top source IPs: 185.136.15.17 (62,979), 172.110.223.9 (31,900), 23.94.174.242 (23,592), 138.226.239.44 (13,510), 172.110.223.49 (11,956), 185.136.15.27 (11,470), 213.55.92.81 (11,053)
+- Top attacker networks (AS): AO ALMAZ 74,454, Husam A. H. Hijazi 43,900, HostPapa 23,605, Microsoft Corporation 17,426, Digital Network 13,510
+- Suricata alerts (top 3): SURICATA STREAM Packet with invalid timestamp (63,007), ET EXPLOIT DoublePulsar Backdoor installation communication (27,237), ET INFO RDP Response To External Host (17,516)
+- Suricata CVEs (top 3): CVE-2001-0540 (17,455), CVE-2022-27255 (741), CVE-2002-0013 (433)
+- Top usernames: sa way ahead, then admin, root. Also distributor_admin, sqlserver and erp, so lots of database and business software guessing.
+
+**Screenshots saved:** ../screenshots/aws/days3-6-*.png, ../screenshots/aws/days1-6-*.png, ../screenshots/investigations/aws-portscan-*.png
+
+**Notes**
+- AWS's ConPot only logged 919 in 6 days and no SNMP alerts made the top 10. So the SNMP reflection only hit Azure, AWS wasn't used.
+- AWS is still SMB and database heavy. Dionaea is 67k (22%) and sa is the top username. ET SCAN Suspicious inbound to MSSQL port 1433 (5,679) shows up too.
+- P0f labels a big slice of AWS traffic as Solaris 6, an operating system from the 1990s. More likely odd scanner packets matching an old signature than real Solaris machines.
+- Several of the same scanners hit both clouds with almost the exact same counts. See investigation 8.
+
 ## Investigations
 
 ### 1. Azure Network Out dropped to zero (24 Oct)
@@ -307,6 +335,27 @@ Two Kibana ranges this time, both written on top of the screenshots:
 - A honeypot can be turned into a weapon against other people if you're not watching it. Running one responsibly means watching outbound traffic too, not just what comes in.
 - Suricata flagged the SNMP requests but only as Informational, and nothing alerted on my own VM's outbound replies. A rule for "my VM is suddenly sending lots of outbound UDP" would be a good detection to write in phase 2.
 
+### 8. The same port scanner hit AWS, with the same count (27 Oct)
+**What I noticed**
+- AWS's dashboard filtered to Honeytrap (the honeypot that answers on every port nothing else uses) had 112k, with a big spike on 27 Oct.
+- Attacks by country showed Kazakhstan on top, and the top IP was 185.136.15.17, the same one that port scanned Azure on 25 to 26 Oct.
+
+**What I checked**
+- In Discover, 185.136.15.17 had 512,975 log entries between 27 Oct 03:00 and 06:00, with a pause from about 03:15 to 04:10.
+- Every row was a different destination port (48953, 24011, 61068, 29351, 37918, 4292, 32982).
+- The median destination port in every 5 minute slot was about 30k to 35k, so the ports were spread over the whole range the whole time, not just on average.
+- I first wondered if it was another SNMP reflection like Azure, but it wasn't. The traffic was TCP flows on random ports with replies both ways, not UDP to port 161.
+- P0f couldn't fingerprint its OS. Fast scanners like masscan build their own packets, so they don't look like any real operating system. Same reason Suricata flagged SURICATA STREAM Packet with invalid timestamp.
+
+**The big finding**
+- It sent almost exactly the same number of probes to both clouds. 62,978 to Azure and 62,979 to AWS, with the same packet pattern every time (5 packets in, 3 out, 385 and 207 bytes, 11 second flows).
+- My firewalls let TCP in on ports 1 to 64000. Take out the ports the other honeypots use and Honeytrap has roughly 63,000 left. So it hit every open port exactly once on each cloud, about 1.5 days apart.
+- Other scanners did the same thing. 172.110.223.9 sent 31,904 to Azure and 31,900 to AWS. 185.136.15.31 (Azure) and 185.136.15.27 (AWS) both sent exactly 11,470. 138.226.239.47 (Azure) and 138.226.239.44 (AWS) sent 13,511 and 13,510. Some switch to a neighbouring IP but keep the same count.
+- So these are systematic whole internet scanning operations that treat every IP the same. They weren't targeting me.
+
+**To check**
+- AWS's Honeytrap histogram has a smaller second spike on 28 Oct. Need to see who it was.
+
 ### Note on AWS monitoring
 - EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
 
@@ -318,7 +367,7 @@ Two Kibana ranges this time, both written on top of the screenshots:
 - Build a Kibana table of the top payload hashes and decode the top 5.
 - Check whether the 109.160.32.x IPs all hit the same honeypot.
 - Check other UDP services T-Pot exposes for reflection risk (look at top UDP destination ports in Kibana).
-- Check AWS for the same SNMP reflection before the block.
+- Check who caused AWS's second Honeytrap spike on 28 Oct.
 - Check which honeypot 23.94.174.242 hit on Azure (on AWS it was Sentrypeer).
 - Find out why ewsposter keeps restarting on AWS.
 - Compare top attacker networks (AS) between Azure and AWS.

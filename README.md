@@ -91,6 +91,14 @@ That's an SNMP reflection attack. Attackers fake the victim's IP as the sender, 
 
 About 754,000 attacks. Other things found: a full range port scan from Kazakhstan that touched almost every port from 0 to 65535 in about 9 hours, and almost every attacking machine fingerprinted as Linux.
 
+### After 6 days on AWS
+
+About 306,000 attacks. Still SMB and database heavy (sa is the top username by far). The SNMP reflection that hit Azure never happened on AWS.
+
+### The same scanners hit both clouds with the same count
+
+The port scanner from Kazakhstan sent 62,978 probes to Azure and 62,979 to AWS, 1.5 days apart, with the exact same packet pattern. That's about the number of open TCP ports on each honeypot, so it hit every open port once on each. Three other scanners did the same thing with matching counts, some switching to a neighbouring IP in between. These are whole internet scanning operations that treat every IP the same, not attacks aimed at me.
+
 More detail is in the [campaign log](docs/campaign-log.md).
 
 ## Problems I've hit so far
