@@ -108,6 +108,14 @@ About 1,000,000 attacks in 6 days, more than the whole first 6 days combined (ab
 
 Something I had to learn: attackers going to specific ports isn't the honeypot steering them. Each honeypot only listens on its own ports, so an IP hitting 5060 picked it because it's looking for phone systems. And a port's list of known vulnerabilities doesn't mean those were used. You need the IDS alerts or honeypot logs for that.
 
+### AWS days 6 to 12
+
+About 245,000 attacks, so Azure got about 4 times more over the same week. That's close to the gap in the first 3 days. Both got hit on 5060, 3389 and 22, but AWS is still the SMB and database one (445 and 1433 in its top ports, DoublePulsar still a top alert, sa still a top username).
+
+- **Same scanning company on both clouds.** One Dutch hosting network (Alsycon) was AWS's top network. Its IPs scanned both clouds a few days apart, checking which service runs on each port, in bursts every 15 minutes.
+- **Real exploit tags showed up.** Suricata tagged 2,696 hits with CVE-2018-13379, a Fortinet VPN bug that leaks saved logins. Bots are hunting for unpatched VPNs.
+- **The toll fraud VPN is back.** A neighbouring IP from the same VPN range that ran the toll fraud scan on Azure in week 1 is now doing the same thing on AWS, still going on 5 Nov.
+
 More detail is in the [campaign log](docs/campaign-log.md).
 
 ## Problems I've hit so far

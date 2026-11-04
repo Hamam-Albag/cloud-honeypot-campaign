@@ -286,6 +286,39 @@ Missed the 30 Oct and 2 Nov check ins so this one covers 6 days in one go. Kiban
 - Lots of IPs go to specific ports, mainly 5060. That's not the honeypot steering them. Each honeypot only listens on its own ports (Sentrypeer on 5060, RDPHoneypot on 3389, Cowrie on 22), so an IP hitting 5060 chose to look for phone systems. Honeytrap is the only one that answers on random ports.
 - I looked up 3389 and 5060 on a port database and both have long lists of known vulnerabilities. That list is everything ever found in any software that uses the port, not proof these IPs used any of it. To see if an exploit was actually tried I need the Suricata CVE panel or the honeypot logs, not the port.
 
+### Days 6 to 12 (5 Nov 2026, AWS)
+
+Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshots.
+
+**AWS, days 6 to 12**
+- Total attacks: about 245,000. That's about 41k a day, down from about 62k a day in days 3 to 6 (which had the big port scans).
+- Top honeypots hit: Honeytrap 93k, Sentrypeer 56k, Cowrie 47k, Dionaea 23k, RDPHoneypot 16k, Heralding 3k, H0neytr4p 2k, Tanner 2k, Mailoney 780, ConPot 676
+- Top destination ports: 5060 (SIP), 445 (SMB), 3389 (RDP), 22 (SSH), 1433 (MSSQL)
+- Top source IPs: 77.83.240.70 (31,169), 1.4.249.123 (21,072), 82.165.34.39 (19,702), 192.210.236.135 (14,595), 185.8.104.235 (12,835), 109.123.227.33 (11,892), 1.2.224.172 (10,835), 194.50.16.198 (9,903)
+- Top attacker networks (AS): Alsycon B.V. 44,581, TOT Public Company 31,921, IONOS SE 26,495, UAB Cherry Servers 20,582, HostPapa 14,711, Contabo Asia 11,893
+- Top countries: United States, Germany, Thailand, Lithuania, the Netherlands, Australia, France, Ireland, United Kingdom, Seychelles
+- Suricata alerts (top 5): SURICATA STREAM RST recv but no session (36,445), ET INFO User-Agent (python-requests) Inbound to Webserver (35,958), SURICATA STREAM FIN recv but no session (35,630), ET EXPLOIT DoublePulsar Backdoor installation communication (32,933), ET INFO RDP Response To External Host (15,441)
+- Suricata CVEs (top 4): CVE-2001-0540 (15,369), CVE-2018-13379 (2,696), CVE-2012-0152 (152), CVE-2025-30208 (63)
+- P0f says Solaris 6 is the biggest slice again, then Linux
+
+**Screenshots saved:** ../screenshots/aws/days6-12-*.png, ../screenshots/investigations/aws-*.png
+
+**Azure vs AWS, days 6 to 12**
+- Azure got about 1,000,000 and AWS about 245,000, so about 4 times more on Azure. Close to the 3.7 times from the first 3 days.
+- The windows aren't exactly the same (AWS starts and ends about 18 hours later) but they overlap for over 5 days, so the gap is real.
+- Both had 5060, 3389 and 22 in their top ports. But AWS still has SMB (445) and MSSQL (1433) in its top 5, DoublePulsar is still a top alert, and sa is still a top username. Azure's top 5 had 80 instead of 1433 and Cowrie is way bigger there.
+- Honeytrap is AWS's top honeypot and Cowrie is Azure's. So Azure gets more SSH guessing and AWS gets more scanning of random ports.
+- Alsycon B.V. hit both. 194.50.16.198 did the service scan on Azure (investigation 11) and also sent 9,903 to AWS, and another Alsycon IP was AWS's top attacker (investigation 12).
+
+**Notes**
+- CVE-2001-0540 (15,369) is exactly ET INFO RDP connection request (15,369) again. Same as on day 2.
+- CVE-2018-13379 (2,696) is a real exploit tag. It's a Fortinet VPN bug where attackers read files like saved VPN logins off the device. So bots are hunting for unpatched Fortinet VPNs. CVE-2025-30208 (63) is a recent one for the Vite web dev server, so bots are already trying new bugs. I should check the payloads before saying these were real attempts.
+- The python-requests alert (35,958) means a lot of the web traffic is Python scripts, not real browsers.
+- The username and password clouds have HTTP headers in them like GET / HTTP/1.1, Accept: */*, User-Agent: python-requests and Connection: keep-alive. That's bots sending web requests to the Telnet port and Cowrie logging each line as a login attempt. One of the "passwords" had my AWS public IP in a Host header, so I covered it in the screenshot.
+- VoIP usernames are showing up too: asterisk, asteriskuser, kamailio, opensips and a2billinguser. Those are all VoIP server software, so the bots that scan 5060 also try to log into the servers behind it.
+- 1.4.249.123 and 1.2.224.172 are both TOT (a Thai telecom). That's why Thailand is number 3 this week.
+- UAB Cherry Servers (Lithuania) has 20,582 but none of its IPs is in the top 10, so it came from lots of IPs.
+
 ## Investigations
 
 ### 1. Azure Network Out dropped to zero (24 Oct)
@@ -412,6 +445,28 @@ Missed the 30 Oct and 2 Nov check ins so this one covers 6 days in one go. Kiban
 - Port 2404 is normally used for industrial control systems (IEC 104), so it was looking for those too.
 - Screenshot: ../screenshots/investigations/azure-scan-194.50.16.198-31oct.png
 
+### 12. 77.83.240.70, the same kind of service scan on AWS (3 Nov)
+- AWS's top source IP for days 6 to 12 with 31,169. Same network as 194.50.16.198 (Alsycon B.V., AS 49870).
+- Filtered Discover to 3 Nov 06:00 to 09:00 and got 149,344 log entries in 3 hours.
+- It came in bursts of about 13,000 every 15 minutes with almost nothing in between. That's a scheduled job, not a person.
+- Same style as investigation 11. Different ports every row (5555, 9200, 9998, 8009) and Suricata picked up HTTP and TLS, so it was checking what service runs on each port.
+- Port 5555 is Android Debug Bridge and Adbhoney logged a session from it. 9200 is Elasticsearch. So it was checking for exposed Android devices and databases too.
+- That's the 3 Nov spike at the end of AWS's attacks histogram.
+- Alsycon is the top network on AWS (44,581) and scanned Azure 3 days earlier from a different IP. Same operation, both clouds.
+- Screenshot: ../screenshots/investigations/aws-scan-77.83.240.70-3nov.png
+
+### 13. The VoIP toll fraud VPN is back, now on AWS (4 to 5 Nov)
+- Looked up 185.213.155.236. It's the same network as Azure's toll fraud IP 185.213.155.228 from investigation 2 (31173 Services AB, a VPN in Frankfurt), just a neighbouring IP.
+- Same behaviour. All Sentrypeer on 5060, and the called_number is a North American number with different prefixes in front (9009, 1001, 2001). It's testing which dial out prefix works so it can make fraud calls. I covered the numbers in the screenshot.
+- The flow_id is the same on every row, so it's one long session from the same source port, like last time.
+- Mistake: I set the range to 28 Oct to 3 Nov but didn't click Update, so Kibana was still showing 4 Nov 10:01 to 5 Nov 00:01. The 162,097 entries are from those 14 hours, not days 6 to 12. It's not in the days 6 to 12 top 10 so it most likely started after the window.
+- It was still going at midnight on 5 Nov at about 1,700 entries every 10 minutes. It'll probably be AWS's top attacker in the next check in.
+- Screenshot: ../screenshots/investigations/aws-sip-185.213.155.236-4nov.png
+
+**To check**
+- Set the range properly and click Update to see when it started.
+- Whether it's the exact same phone number as the Azure one.
+
 ### Note on AWS monitoring
 - EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
 
@@ -430,3 +485,6 @@ Missed the 30 Oct and 2 Nov check ins so this one covers 6 days in one go. Kiban
 - Check Azure Network Out on 29 Oct to see if the port 5060 flood was a SIP reflection.
 - Search 345gs5662d34 to see which botnet uses it.
 - Check what RDPHoneypot logged for 216.250.250.134 and its full network name.
+- Check the payloads behind the CVE-2018-13379 and CVE-2025-30208 alerts on AWS.
+- Fix the 185.213.155.236 range and see when the AWS toll fraud started.
+- Do a fair same window comparison for days 6 to 12 (Azure over AWS's window).
