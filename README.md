@@ -99,6 +99,15 @@ About 306,000 attacks. Still SMB and database heavy (sa is the top username by f
 
 The port scanner from Kazakhstan sent 62,978 probes to Azure and 62,979 to AWS, 1.5 days apart, with the exact same packet pattern. That's about the number of open TCP ports on each honeypot, so it hit every open port once on each. Three other scanners did the same thing with matching counts, some switching to a neighbouring IP in between. These are whole internet scanning operations that treat every IP the same, not attacks aimed at me.
 
+### Azure days 6 to 12
+
+About 1,000,000 attacks in 6 days, more than the whole first 6 days combined (about 754,000). SSH (Cowrie) is now the top honeypot with 378k. Two single IPs caused the biggest spikes:
+
+- **2 Nov:** one IP sent about 350,000 RDP log entries in 7 hours, opening and closing Remote Desktop sessions nonstop. That looks like RDP brute forcing.
+- **29 Oct:** two IPs on different networks hit port 5060 (VoIP) with the exact same packet, one 189 byte request and one 771 byte reply each time. That's the same shape as the SNMP reflection, so I'm checking if this was a SIP reflection too.
+
+Something I had to learn: attackers going to specific ports isn't the honeypot steering them. Each honeypot only listens on its own ports, so an IP hitting 5060 picked it because it's looking for phone systems. And a port's list of known vulnerabilities doesn't mean those were used. You need the IDS alerts or honeypot logs for that.
+
 More detail is in the [campaign log](docs/campaign-log.md).
 
 ## Problems I've hit so far

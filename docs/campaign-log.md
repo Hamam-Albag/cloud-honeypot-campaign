@@ -261,6 +261,31 @@ Two Kibana ranges, written on top of the screenshots:
 - P0f labels a big slice of AWS traffic as Solaris 6, an operating system from the 1990s. More likely odd scanner packets matching an old signature than real Solaris machines.
 - Several of the same scanners hit both clouds with almost the exact same counts. See investigation 8.
 
+### Days 6 to 12 (4 Nov 2026, Azure)
+
+Missed the 30 Oct and 2 Nov check ins so this one covers 6 days in one go. Kibana range: 27 Oct 16:21 to 2 Nov 16:21 AEDT, written on top of the screenshots.
+
+**Azure, days 6 to 12**
+- Total attacks: about 1,000,000. That's about 167k a day, up from about 144k a day in days 3 to 6 (and that included the SNMP flood).
+- Top honeypots hit: Cowrie 378k, Sentrypeer 279k, RDPHoneypot 160k, Honeytrap 128k, Dionaea 27k, Tanner 14k, H0neytr4p 10k, ConPot 4k, Mailoney 926, Redishoneypot 785
+- Top destination ports: 5060 (SIP), 3389 (RDP), 22 (SSH), 80 (HTTP), 445 (SMB)
+- Top countries: United States, the Netherlands, Bulgaria, China, Hong Kong, Bangladesh, Germany, South Korea, United Kingdom, France
+- Attacker IP reputation: mostly bad reputation, sip abuse and ssh abuse
+- P0f still says almost everything is Linux, with a small slice of Windows
+- Top usernames: root way ahead, then admin, Administrator, sa, ubuntu, user and (blank). Also claude and openclaw again, plus minecraft, steam, hadoop, oracle, postgres and jenkins.
+- Top passwords: (blank) way ahead, then 123456, admin, Passw0rd, 1qaz@WSX, ubuntu
+- I didn't grab the top IP and CVE table this time. The IPs below are the ones I looked into from the histograms and Discover.
+
+**Screenshots saved:** ../screenshots/azure/days6-12-*.png, ../screenshots/investigations/azure-*.png, ../screenshots/investigations/port-*-lookup.png
+
+**Notes**
+- Cowrie (SSH and Telnet) went from 119k in days 3 to 6 to 378k and is now the top honeypot. ConPot dropped from 42k to 4k because UDP 161 is blocked now, so the SNMP flood can't come back.
+- The attacks histogram sits around 15k per 3 hours most of the time, with two big spikes, one on 29 Oct and a bigger one on 2 Nov. The unique source IPs line stays flat through both spikes, so they came from a handful of IPs, not more attackers.
+- The 29 Oct spike is Sentrypeer on port 5060 (investigation 10) and the 2 Nov spike is RDPHoneypot on port 3389 (investigation 9). The Suricata alert categories jump to 60k to 80k per bar on 2 Nov, mostly Misc activity, which matches the RDP flood.
+- 345gs5662d34 shows up as both a username and a password. It's a weird string to guess, so it looks like one botnet's hardcoded login. Worth searching later.
+- Lots of IPs go to specific ports, mainly 5060. That's not the honeypot steering them. Each honeypot only listens on its own ports (Sentrypeer on 5060, RDPHoneypot on 3389, Cowrie on 22), so an IP hitting 5060 chose to look for phone systems. Honeytrap is the only one that answers on random ports.
+- I looked up 3389 and 5060 on a port database and both have long lists of known vulnerabilities. That list is everything ever found in any software that uses the port, not proof these IPs used any of it. To see if an exploit was actually tried I need the Suricata CVE panel or the honeypot logs, not the port.
+
 ## Investigations
 
 ### 1. Azure Network Out dropped to zero (24 Oct)
@@ -356,6 +381,37 @@ Two Kibana ranges, written on top of the screenshots:
 **To check**
 - AWS's Honeytrap histogram has a smaller second spike on 28 Oct. Need to see who it was.
 
+### 9. 216.250.250.134, an RDP flood on Azure (2 Nov)
+- The biggest spike in days 6 to 12. Filtered Discover to this IP on 2 Nov 00:00 to 12:00 and got 350,815 log entries.
+- It ran from about midnight to 07:06 at a steady 8,000 entries every 10 minutes, then stopped. Not the daily reboot, that's at 13:45 on Azure.
+- Every row was port 3389 (RDP, Windows Remote Desktop). Each flow lasted about 1 second with 8 to 12 packets each way, about 1.7 KB in and 2.5 KB out, and then closed.
+- So it was opening a proper RDP session, getting a reply from RDPHoneypot, closing it and going again over and over. That's what RDP brute forcing or credential checking looks like. The flow records don't show the passwords it tried, that would be in RDPHoneypot's own logs.
+- The network name is cut off in the screenshot (starts with Majes...). Need to check it.
+- Screenshot: ../screenshots/investigations/azure-rdp-216.250.250.134-2nov.png
+
+### 10. Two IPs flooding port 5060 the same way (29 Oct)
+**What I saw**
+- 91.110.167.131 (CNSERVERS LLC) had 116,682 log entries and 8.212.14.105 (Alibaba US) had 63,756, both on 29 Oct and nothing before or after.
+- Both only hit port 5060 (SIP, the protocol VoIP phones use), which is Sentrypeer.
+- Every flow from both IPs was exactly the same. 1 packet in (189 bytes) and 1 packet out (771 bytes), flow age 0, and a new flow each time.
+
+**What it could be**
+- Two different networks sending the exact same packet at the same time means it's either one operator running the same tool from two servers, or something I've seen before.
+- Each reply is about 4 times bigger than the request, one packet in and one out, over UDP. That's the same shape as the SNMP reflection in investigation 7. SIP can be used for reflection too. If the source IPs were faked, these two would be victims and not attackers.
+- I haven't proven it either way yet.
+
+**To check**
+- Azure Monitor Network Out on 29 Oct. If it's a reflection there should be a bump like the SNMP one.
+- What Sentrypeer logged for these IPs. If it's only OPTIONS requests and no REGISTER or INVITE, that points to reflection rather than someone trying to use the phone system.
+- If it is reflection, think about rate limiting or blocking UDP 5060 like I did with 161. But Sentrypeer is a big part of the data so I'd lose a lot.
+- Screenshots: ../screenshots/investigations/azure-sip-91.110.167.131-29oct.png and azure-sip-8.212.14.105-29oct.png
+
+### 11. 194.50.16.198, a service scan from the Netherlands (31 Oct)
+- 71,715 log entries, all in one burst on the morning of 31 Oct. Network Alsycon B.V. in Amsterdam. Probably a big part of why the Netherlands is the number 2 country this week.
+- Unlike the Kazakhstan scanner it wasn't just touching ports. Suricata picked up HTTP and TLS on ports like 2404, 6579, 8083 and 5623, so it was checking what service runs on each port, not just if the port is open.
+- Port 2404 is normally used for industrial control systems (IEC 104), so it was looking for those too.
+- Screenshot: ../screenshots/investigations/azure-scan-194.50.16.198-31oct.png
+
 ### Note on AWS monitoring
 - EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
 
@@ -371,3 +427,6 @@ Two Kibana ranges, written on top of the screenshots:
 - Check which honeypot 23.94.174.242 hit on Azure (on AWS it was Sentrypeer).
 - Find out why ewsposter keeps restarting on AWS.
 - Compare top attacker networks (AS) between Azure and AWS.
+- Check Azure Network Out on 29 Oct to see if the port 5060 flood was a SIP reflection.
+- Search 345gs5662d34 to see which botnet uses it.
+- Check what RDPHoneypot logged for 216.250.250.134 and its full network name.
