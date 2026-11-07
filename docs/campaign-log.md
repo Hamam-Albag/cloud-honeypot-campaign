@@ -28,10 +28,24 @@ Keep public IPs, passwords and keys OUT of this file if it goes on GitHub.
 - 22 Oct: AWS credit showed US$120 remaining, so US$20 of the bonus credit was already earned. Azure credit is in the Education hub, not the sponsorships site. Azure shows A$142 credit (about US$100) and A$2.72 used so far in October.
 - 22 Oct: The first logs after go live weren't attacks. On Azure it was the VM talking to 168.63.129.16 (Azure's own platform service) and on AWS it was DNS to 172.31.0.2 (the VPC resolver) plus outbound traffic. Have to filter out my own infrastructure's traffic to find the real first attack.
 - 24 Oct: Noticed Network Out on Azure drop to zero and all containers showing Up 4 hours. Found the cause in the crontab: T-Pot reboots itself every day at 02:45 UTC (13:45 Sydney time). It stops T-Pot, cleans up old Docker containers, images and volumes, then reboots. So there's a gap of a few minutes in the data every day. AWS has the same job but its boot history shows it reboots at about 04:51 UTC (15:51 Sydney), not 02:45 like Azure. So the gaps don't line up exactly, but each one is only a few minutes.
+- 4 Nov: SSH timed out on both VMs. My home IP had changed and SSH is locked to my IP, so I updated the source IP on the Azure NSG and AWS security group rules.
+- 5 Nov, maintenance check on both VMs:
+  - Disk: Azure 31% used (37 GB of 126 GB), AWS 23% (27 GB). Plenty of room for the month.
+  - SSH: passwordauthentication no and permitrootlogin without-password on both, so only keys work and root can't log in with a password.
+  - ewsposter on AWS had 0 restarts and normal logs. It was only about 30 minutes after AWS's daily reboot though, so need to check again. Checked again on 6 Nov: AWS had 1 restart (fine), but Azure had 52. Azure's logs look normal though (it's sending alerts to the EWS backend and the "already submitted" warnings are just files it already sent), so it crashes now and then and comes straight back. Low priority since it doesn't touch my own data.
+  - UDP ports T-Pot exposes on both: 161 (ConPot SNMP, blocked since 27 Oct), 5060 (Sentrypeer SIP), 623 (ConPot IPMI), 69 (Dionaea TFTP) and 5000 (CiscoASA). 623 and 69 are known amplification protocols, so I need to check bytes in vs bytes out on each before deciding to block anything.
+  - Data retention: Elasticsearch makes one index per day and T-Pot's ILM policy (tpot) deletes each one after 30 days. My first index (21 Oct UTC) would have been deleted around 4pm on 20 Nov, right before the month summary. Changed the delete age to 60 days on both. Checked again on 6 Nov after the daily reboot and it still says 60d, so it stuck.
+  - Found an index called logstash-1970.01.01 with a couple of records in it. That's a broken timestamp (1 Jan 1970 is time zero), harmless.
+  - AWS has a logstash-2026.10.21 index even though it went live on 22 Oct. Index names use UTC dates and 22 Oct 10:32 Sydney is still 21 Oct in UTC.
+- 6 Nov, outbound traffic alerts so I'd catch another reflection attack while it's happening:
+  - Azure: honeypot-outbound-spike emails me if Network Out goes over 8 MB in 5 minutes (normal is a few MB at most, the SNMP flood was 9.5 to 18 MB). Also added honeypot-cpu-maxed (CPU average over 95%, a classic sign of a crypto miner) and Azure has a default VM Availability alert.
+  - The Network Out Total metric kept failing with InternalServerError, from the portal and the CLI, even with skipmetricvalidation (Activity ID c106f741-5775-43aa-b9dd-f8bd3903bec2). Microsoft.Insights was registered and a CPU alert worked fine, so it was only that metric. The older Network Out metric worked, and it's arguably better since it only counts traffic going out to the internet.
+  - AWS: CloudWatch alarm honeypot-outbound-spike on NetworkOut (Sum over 5 minutes) over 5 MB, emailing me through an SNS topic. AWS's normal peaks over the week were about 3.3 MB. Left all EC2 actions off so an alarm can't stop the instance.
+- 6 Nov: Switching from check ins every few days to weekly reports. Each week runs Thursday 10:32 to Thursday 10:32 (from when AWS went live) and both clouds use the exact same window, so the comparisons are fair. The earlier check ins stay as they are. Running totals (days 1 to N) are dropped since they're just the windows added up, and the month summary covers that at the end.
 
 ## Check-ins
 
-Copy this block for every check in (every 2 or 3 days).
+Copy this block for every check in. From week 3 these are weekly reports with the same window on both clouds.
 
 ### Day __ (date)
 
@@ -319,6 +333,94 @@ Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshot
 - 1.4.249.123 and 1.2.224.172 are both TOT (a Thai telecom). That's why Thailand is number 3 this week.
 - UAB Cherry Servers (Lithuania) has 20,582 but none of its IPs is in the top 10, so it came from lots of IPs.
 
+## Weekly reports
+
+From here every report uses the exact same window on both clouds. Azure's windows start at 10:30 instead of 10:32, 2 extra minutes out of a week, which doesn't change anything.
+
+| | Week 1 | Week 2 |
+| --- | --- | --- |
+| Window | 22 Oct 10:32 to 29 Oct 10:32 | 29 Oct 10:32 to 5 Nov 10:32 |
+| Azure attacks | about 982,000 | about 1.8 million |
+| AWS attacks | about 336,000 | about 656,000 |
+| Azure vs AWS | 2.9 times more | 2.7 times more |
+| Azure top honeypot | Sentrypeer (393k) | Honeytrap (809k) |
+| AWS top honeypot | Honeytrap (123k) | Honeytrap (355k) |
+| Azure top network | Banatsync Srl (162,365) | Alsycon B.V. (669,382) |
+| AWS top network | AO ALMAZ (75,660) | Alsycon B.V. (319,992) |
+
+Kibana shows Azure week 2 as "2m" but the top 10 honeypots add up to about 1.79 million, so about 1.8 million is closer.
+
+### Week 1 (22 Oct 10:32 to 29 Oct 10:32)
+
+**Azure**
+- Total attacks: about 982,000
+- Top honeypots: Sentrypeer 393k, Cowrie 229k, Honeytrap 195k, RDPHoneypot 54k, Dionaea 50k, ConPot 45k, Tanner 6k, H0neytr4p 4k, Heralding 3k, Redishoneypot 943
+- Top ports: 5060, 3389, 161, 22, 1433
+- Top countries: United States, Bulgaria, Germany, Kazakhstan, Bangladesh, Philippines, United Kingdom, France, Hong Kong, the Netherlands
+- Top source IPs: 185.136.15.17 (62,978), 185.213.155.228 (44,560), 172.110.223.9 (31,904), 141.153.237.4 (25,178), 91.110.167.131 (22,598), 23.94.174.242 (18,510), 82.165.34.39 (15,686), 8.212.14.105 (13,625)
+- Top networks: Banatsync Srl 162,365, AO ALMAZ 74,794, Google 58,447, 31173 Services AB 46,947, Husam A. H. Hijazi 43,924
+- Suricata alerts: GPL SNMP request udp (513,720) and GPL SNMP public access udp (513,645) way ahead because of the SNMP reflection, then invalid timestamp (63,031) from the port scan, then RDP
+- Top CVEs: CVE-2002-0013 (1,027,453, the SNMP alerts), CVE-2001-0540 (39,665, the RDP alerts), CVE-2005-4050 (1,952), CVE-2006-2369 (1,637), CVE-2022-27255 (741)
+- Top usernames: root, sa, admin, Administrator. Passwords: (blank), 123456, 123
+
+**AWS**
+- Total attacks: about 336,000
+- Top honeypots: Honeytrap 123k, Sentrypeer 98k, Dionaea 72k, RDPHoneypot 20k, Cowrie 14k, Tanner 3k, Heralding 2k, H0neytr4p 1k, ConPot 1k, Mailoney 937
+- Top ports: 5060, 445, 1433, 3389, 23
+- Top countries: United States, Kazakhstan, Philippines, Germany, United Kingdom, Ethiopia, China, the Netherlands, France, Belgium
+- Top source IPs: 185.136.15.17 (62,979), 172.110.223.9 (31,900), 23.94.174.242 (23,592), 138.226.239.44 (15,153), 185.136.15.27 (12,676), 172.110.223.49 (11,956), 82.165.34.39 (11,598), 213.55.92.81 (11,053)
+- Top networks: AO ALMAZ 75,660, Husam A. H. Hijazi 43,919, HostPapa 28,040, Microsoft 19,939, IONOS 18,232
+- Suricata alerts: invalid timestamp (63,008) from the port scan, DoublePulsar (36,431), DShield block list (18,661), RDP, MSSQL port 1433 (6,455)
+- Top CVEs: CVE-2001-0540 (17,860), CVE-2022-27255 (741), CVE-2002-0013 (445)
+- Top usernames: sa is the biggest, then root and admin. P0f says Solaris 6 again.
+
+**Comparing week 1**
+- Azure got 2.9 times more attacks than AWS over the exact same 7 days.
+- Azure is SSH and VoIP heavy. Cowrie is 23% of Azure's traffic and only 4% of AWS's.
+- AWS is SMB and database heavy. Dionaea is 21% of AWS's traffic and only 5% of Azure's, sa is AWS's top username and AWS had 2.6 times more DoublePulsar alerts (36,431 vs 13,850).
+- The internet wide scanners hit both clouds the same: 185.136.15.17 (62,978 vs 62,979), 172.110.223.9 (31,904 vs 31,900), AO ALMAZ (74,794 vs 75,660) and Husam A. H. Hijazi (43,924 vs 43,919).
+- CVE-2022-27255 had exactly 741 on both. It's a Realtek router bug triggered through SIP on port 5060, so one scanner checked both clouds the same way.
+- What made Azure bigger was stuff that only hit Azure: Banatsync Srl (162,365, from lots of IPs since none of its IPs are in the top 10), the toll fraud VPN (185.213.155.228), the SNMP reflection (141.153.237.4) and the SIP pair (91.110.167.131 and 8.212.14.105).
+
+**Screenshots:** ../screenshots/azure/week1-*.png and ../screenshots/aws/week1-*.png
+
+### Week 2 (29 Oct 10:32 to 5 Nov 10:32)
+
+**Azure**
+- Total attacks: about 1.8 million
+- Top honeypots: Honeytrap 809k, Cowrie 428k, Sentrypeer 258k, RDPHoneypot 199k, Dionaea 33k, Heralding 31k, Tanner 17k, H0neytr4p 11k, ConPot 3k, Mailoney 2k
+- Top ports: 5060, 3389, 22, 5900, 80
+- Top countries: the Netherlands, United States, Bulgaria, China, Germany, Bangladesh, United Kingdom, France, South Korea, Hong Kong
+- Top source IPs: 194.50.16.198 (458,403), 77.83.240.70 (208,343), 136.144.199.59 (101,821), 216.250.250.134 (86,861), 115.191.15.226 (48,470), 91.110.167.131 (36,032), 185.8.104.235 (20,075), 8.212.14.105 (18,406)
+- Top networks: Alsycon B.V. 669,382, Banatsync Srl 150,114, Signet B.V. 101,821, Majestic Hosting Solutions 88,840, Google 51,019, Beijing Volcano Engine 49,417
+- Suricata alerts: python-requests (649,739), RDP (about 148k each), VNC server response (66,729), VNC Server Not Requiring Authentication (30,995), VNC Authentication Failure (30,587)
+- Top CVEs: CVE-2001-0540 (145,297), CVE-2006-2369 (31,015), CVE-2018-13379 (22,170), CVE-2024-4577 (1,216), CVE-2021-44228 (110)
+
+**AWS**
+- Total attacks: about 656,000
+- Top honeypots: Honeytrap 355k, Sentrypeer 185k, Cowrie 49k, Dionaea 32k, RDPHoneypot 18k, Heralding 4k, H0neytr4p 3k, Tanner 3k, Mailoney 2k, Miniprint 2k
+- Top ports: 5060, 445, 3389, 22, 1080
+- Top countries: the Netherlands, Germany, United States, Thailand, Lithuania, Australia, France, Vietnam, China, Indonesia
+- Top source IPs: 194.50.16.198 (218,261), 185.213.155.236 (114,661), 77.83.240.70 (98,378), 1.4.249.123 (21,072), 82.165.34.39 (20,714), 185.8.104.235 (20,407)
+- Top networks: Alsycon B.V. 319,992, 31173 Services AB 114,952, IONOS 32,311, TOT 31,921, UAB Cherry Servers 28,315
+- Suricata alerts: python-requests (308,730), STREAM RST and FIN with no session (about 36k each), DoublePulsar (25,308), RDP, VNC server response (10,560)
+- Top CVEs: CVE-2001-0540 (16,608), CVE-2018-13379 (5,500), CVE-2012-0152 (186), CVE-2025-30208 (63)
+- The username cloud has VoIP web panel paths like GET /_asterisk/graph.php and GET /recordings/misc/graph.php, and OPTIONS rtsp://example.com (camera streams). Bots sending web requests to the Telnet port again, this time looking for FreePBX and cameras.
+
+**Comparing week 2**
+- Azure got 2.7 times more than AWS, close to week 1.
+- Alsycon B.V. was the top network on both. 194.50.16.198 and 77.83.240.70 hit BOTH clouds (458k and 208k on Azure, 218k and 98k on AWS). Together that's about 37% of Azure's week and 49% of AWS's. Both IPs hit Azure about twice as hard as AWS.
+- Without Alsycon, Azure would be about 1.13 million and AWS about 336,000, so still about 3.4 times more on Azure.
+- Honeytrap became the top honeypot on both because the Alsycon scans hit lots of random ports, which is what Honeytrap catches.
+- The toll fraud VPN moved clouds. In week 1 31173 Services AB was on Azure (185.213.155.228, 44,560). In week 2 it was on AWS (185.213.155.236, 114,661) and not in Azure's top 10.
+- The SIP pair (91.110.167.131 and 8.212.14.105) only hit Azure, in both weeks.
+- New on Azure: a VNC wave. Port 5900 is in the top 5, Heralding (which handles VNC) went from 3k to 31k, and there were about 67k VNC alerts. CVE-2006-2369 (31,015) matches the "VNC Server Not Requiring Authentication" alert (30,995), so it's that rule's CVE tag again, not proof of an exploit. Need to find who it was.
+- New exploit tags on Azure: CVE-2024-4577 (1,216), a PHP bug on Windows servers from 2024, and CVE-2021-44228 (110), which is Log4Shell. CVE-2018-13379 (Fortinet VPN) went up to 22,170 on Azure and 5,500 on AWS.
+- Port 1080 (SOCKS proxy) is in AWS's top 5, so something was checking for open proxies.
+- The password clouds had my own public IP in a Host header again (AWS in both weeks, Azure in week 2), so I covered them.
+
+**Screenshots:** ../screenshots/azure/week2-*.png and ../screenshots/aws/week2-*.png
+
 ## Investigations
 
 ### 1. Azure Network Out dropped to zero (24 Oct)
@@ -419,8 +521,15 @@ Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshot
 - It ran from about midnight to 07:06 at a steady 8,000 entries every 10 minutes, then stopped. Not the daily reboot, that's at 13:45 on Azure.
 - Every row was port 3389 (RDP, Windows Remote Desktop). Each flow lasted about 1 second with 8 to 12 packets each way, about 1.7 KB in and 2.5 KB out, and then closed.
 - So it was opening a proper RDP session, getting a reply from RDPHoneypot, closing it and going again over and over. That's what RDP brute forcing or credential checking looks like. The flow records don't show the passwords it tried, that would be in RDPHoneypot's own logs.
-- The network name is cut off in the screenshot (starts with Majes...). Need to check it.
 - Screenshot: ../screenshots/investigations/azure-rdp-216.250.250.134-2nov.png
+
+**Update (7 Nov), RDPHoneypot's own logs**
+- Filtered type:RDPHoneypot and this IP from 28 Oct to 7 Nov: 86,848 entries, all on the night of 1 Nov into the morning of 2 Nov, nothing before or after.
+- The network is Majestic Hosting Solutions, LLC (AS 396073) in the US.
+- Every second it did the same three steps: session.connect, then rdphoneypot.login with auth_method NLA and domain WORKGROUP, then session.closed about a second later.
+- NLA (Network Level Authentication) means the client has to send a username and password before it even gets the Windows login screen. So every session was one login attempt. That confirms it was RDP brute forcing, roughly 87,000 attempts in one night. MITRE ATT&CK T1110 Brute Force.
+- These logs don't show which usernames or passwords it tried.
+- Screenshot: ../screenshots/investigations/azure-rdp-216.250.250.134-rdphoneypot.png (my Azure IP covered)
 
 ### 10. Two IPs flooding port 5060 the same way (29 Oct)
 **What I saw**
@@ -439,6 +548,13 @@ Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshot
 - If it is reflection, think about rate limiting or blocking UDP 5060 like I did with 161. But Sentrypeer is a big part of the data so I'd lose a lot.
 - Screenshots: ../screenshots/investigations/azure-sip-91.110.167.131-29oct.png and azure-sip-8.212.14.105-29oct.png
 
+**Update (7 Nov)**
+- All of 91.110.167.131's traffic from 29 Oct 10:30 to 7 Nov: 72,193 entries, all on 29 Oct and nothing after.
+- Every row is a Suricata flow record with app_proto_ts failed, meaning Suricata couldn't read the request as proper SIP.
+- Looked at all UDP flows on Azure in week 2. The exact same 189 bytes in, 771 bytes out shape shows up from lots of other networks too, like a server in Singapore, ISPs in Bangladesh and Türkiye and Saudi Telecom, all on 5 Nov. So that packet shape is just a common SIP probe plus Sentrypeer's normal 771 byte reply. It's not unique to these two IPs. What made them stand out was the volume, about one a second for a whole day.
+- That makes reflection less likely. A 4x reply is small compared to SNMP's 14x, and the same shape is everywhere. Still need Azure Network Out for 29 Oct to rule it out properly, and the Sentrypeer records (type:Sentrypeer) to see the SIP method.
+- Screenshots: ../screenshots/investigations/azure-sip-91.110.167.131-all-flows.png and azure-udp-flows-week2.png
+
 ### 11. 194.50.16.198, a service scan from the Netherlands (31 Oct)
 - 71,715 log entries, all in one burst on the morning of 31 Oct. Network Alsycon B.V. in Amsterdam. Probably a big part of why the Netherlands is the number 2 country this week.
 - Unlike the Kazakhstan scanner it wasn't just touching ports. Suricata picked up HTTP and TLS on ports like 2404, 6579, 8083 and 5623, so it was checking what service runs on each port, not just if the port is open.
@@ -452,7 +568,7 @@ Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshot
 - Same style as investigation 11. Different ports every row (5555, 9200, 9998, 8009) and Suricata picked up HTTP and TLS, so it was checking what service runs on each port.
 - Port 5555 is Android Debug Bridge and Adbhoney logged a session from it. 9200 is Elasticsearch. So it was checking for exposed Android devices and databases too.
 - That's the 3 Nov spike at the end of AWS's attacks histogram.
-- Alsycon is the top network on AWS (44,581) and scanned Azure 3 days earlier from a different IP. Same operation, both clouds.
+- Alsycon is the top network on AWS (44,581). Correction from the weekly reports: both 194.50.16.198 and 77.83.240.70 hit both clouds, so it's the same two IPs scanning both, not a different IP for each cloud.
 - Screenshot: ../screenshots/investigations/aws-scan-77.83.240.70-3nov.png
 
 ### 13. The VoIP toll fraud VPN is back, now on AWS (4 to 5 Nov)
@@ -463,9 +579,29 @@ Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshot
 - It was still going at midnight on 5 Nov at about 1,700 entries every 10 minutes. It'll probably be AWS's top attacker in the next check in.
 - Screenshot: ../screenshots/investigations/aws-sip-185.213.155.236-4nov.png
 
-**To check**
-- Set the range properly and click Update to see when it started.
-- Whether it's the exact same phone number as the Azure one.
+**Update (7 Nov), with the range fixed**
+- 28 Oct 10:32 to 5 Nov 10:32 with Update clicked: 229,369 entries. It started around 9am on 4 Nov and was still going at the end of the window, so it's all in week 2.
+- One Suricata flow lasted 49,917 seconds (13.9 hours) with 80,838 packets each way and about 62 to 68 MB each way. That flow started at 15:54 on 4 Nov, 3 minutes after AWS's daily reboot at 15:51. Same as investigation 2 on Azure, where it came back 3 minutes after the reboot. So it never stops, it just reconnects as soon as the honeypot is back.
+- Prefixes this time were 7009, 8009, 9009 and 90009. It's a different North American number from the one it tried on Azure in week 1, but the same trick.
+- This time Suricata did alert: ET VOIP INVITE Message Flood UDP and GPL VOIP SIP INVITE message flooding, category Attempted Denial of Service. On Azure in week 1 it didn't raise a single alert for 8 hours. Not sure why yet, maybe it was faster this time and crossed the rule's rate limit.
+- I also covered the phone numbers in the old week 1 screenshot so neither number is in the repo.
+- Screenshot: ../screenshots/investigations/aws-tollfraud-185.213.155.236-week2.png
+
+### 14. A VNC wave on Azure from Contabo servers (4 to 5 Nov)
+- Filtered dest_port:5900 on Azure for week 2: 364,576 entries, almost all from the evening of 4 Nov to the end of the window, and still climbing at the end.
+- Port 5900 is VNC, a remote desktop tool mostly used on Linux and Macs. Heralding (which handles VNC logins) went from 3k in week 1 to 31k in week 2.
+- The sources were lots of different servers, all from Contabo GmbH (AS 51167), a cheap German VPS provider, for example 167.86.102.132, 94.250.203.94, 173.249.54.93 and 84.46.252.81. So one operation spread over many rented servers.
+- The alerts were GPL INFO VNC server response and VNC Authentication Failure, so it connected, got the VNC handshake and tried to log in. CVE-2006-2369 (a RealVNC login bypass from 2006) matched the "VNC Server Not Requiring Authentication" alert count, so that's the rule's CVE tag again, not a real exploit.
+- It barely showed up on AWS (about 10,500 VNC alerts vs 67,000 on Azure).
+- Need to check if it carried on into week 3.
+- Screenshot: ../screenshots/investigations/azure-vnc-5900-week2.png (my Azure IP covered)
+
+### 15. Fortinet VPN exploit attempts on AWS (CVE-2018-13379)
+- 5,500 alerts in week 2, in two short bursts, one on the morning of 3 Nov and one just after midnight on 5 Nov. Dozens of alerts in the same second, so it's an automated tool firing lots of requests at once.
+- The alert metadata says the affected product is Fortigate and it's tagged CISA_KEV, which means it's on CISA's Known Exploited Vulnerabilities list. Real attackers use this one, it's not just old noise.
+- The MITRE techniques in the alert are T1083 File and Directory Discovery and T1082 System Information Discovery, since the bug lets you read files off the VPN like saved logins.
+- Still need the request path and the source IP. In Discover, add the src_ip and http.url columns.
+- Screenshot: ../screenshots/investigations/aws-cve-2018-13379-week2.png
 
 ### Note on AWS monitoring
 - EC2's Monitoring tab shows CPU, network and status checks, but not memory. AWS can't see inside the VM's memory unless you install the CloudWatch Agent. Azure shows available memory by default. That's a real difference between the two clouds.
@@ -487,4 +623,5 @@ Kibana range: 28 Oct 10:32 to 3 Nov 10:32 AEDT, written on top of the screenshot
 - Check what RDPHoneypot logged for 216.250.250.134 and its full network name.
 - Check the payloads behind the CVE-2018-13379 and CVE-2025-30208 alerts on AWS.
 - Fix the 185.213.155.236 range and see when the AWS toll fraud started.
-- Do a fair same window comparison for days 6 to 12 (Azure over AWS's window).
+- Find who caused the VNC wave on Azure in week 2.
+- Look up 136.144.199.59 (Signet B.V., 101,821 on Azure week 2) and Banatsync Srl.
