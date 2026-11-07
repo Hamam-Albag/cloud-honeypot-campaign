@@ -42,6 +42,7 @@ Keep public IPs, passwords and keys OUT of this file if it goes on GitHub.
   - The Network Out Total metric kept failing with InternalServerError, from the portal and the CLI, even with skipmetricvalidation (Activity ID c106f741-5775-43aa-b9dd-f8bd3903bec2). Microsoft.Insights was registered and a CPU alert worked fine, so it was only that metric. The older Network Out metric worked, and it's arguably better since it only counts traffic going out to the internet.
   - AWS: CloudWatch alarm honeypot-outbound-spike on NetworkOut (Sum over 5 minutes) over 5 MB, emailing me through an SNS topic. AWS's normal peaks over the week were about 3.3 MB. Left all EC2 actions off so an alarm can't stop the instance.
 - 6 Nov: Switching from check ins every few days to weekly reports. Each week runs Thursday 10:32 to Thursday 10:32 (from when AWS went live) and both clouds use the exact same window, so the comparisons are fair. The earlier check ins stay as they are. Running totals (days 1 to N) are dropped since they're just the windows added up, and the month summary covers that at the end.
+- 7 Nov: Had a quick look at credit. Both clouds have roughly $70 left, but I only glanced at it. Need to write down the exact numbers at the next weekly report, since Azure for Students disables the VM when the credit runs out.
 
 ## Check-ins
 
@@ -529,6 +530,8 @@ Kibana shows Azure week 2 as "2m" but the top 10 honeypots add up to about 1.79 
 - Every second it did the same three steps: session.connect, then rdphoneypot.login with auth_method NLA and domain WORKGROUP, then session.closed about a second later.
 - NLA (Network Level Authentication) means the client has to send a username and password before it even gets the Windows login screen. So every session was one login attempt. That confirms it was RDP brute forcing, roughly 87,000 attempts in one night. MITRE ATT&CK T1110 Brute Force.
 - These logs don't show which usernames or passwords it tried.
+- AbuseIPDB (7 Nov): 100% abuse confidence, 257 reports from 78 different people, latest 1 day before. Hosted by Majestic Hosting Solutions (spinservers.com) in Dallas. So it's a known bad IP that hits lots of people, not just me.
+- Screenshot: ../screenshots/investigations/lookup-216.250.250.134-abuseipdb.png
 - Screenshot: ../screenshots/investigations/azure-rdp-216.250.250.134-rdphoneypot.png (my Azure IP covered)
 
 ### 10. Two IPs flooding port 5060 the same way (29 Oct)
@@ -555,11 +558,20 @@ Kibana shows Azure week 2 as "2m" but the top 10 honeypots add up to about 1.79 
 - That makes reflection less likely. A 4x reply is small compared to SNMP's 14x, and the same shape is everywhere. Still need Azure Network Out for 29 Oct to rule it out properly, and the Sentrypeer records (type:Sentrypeer) to see the SIP method.
 - Screenshots: ../screenshots/investigations/azure-sip-91.110.167.131-all-flows.png and azure-udp-flows-week2.png
 
+**Answer (7 Nov): not a reflection**
+- Sentrypeer did log these as real SIP messages, 58,470 of them, all on 29 Oct. Every one had called_number 1, so it kept sending the same SIP request to extension 1, about once a second. I didn't add the sip_method column so I still don't know if it was OPTIONS or INVITE.
+- Azure Network Out from 28 Oct to 7 Nov has no bump on 29 Oct at all. It sits at the normal level that day. The SNMP reflection made a clear jump, so if this was a reflection it would show.
+- So it was a SIP scanner hammering extension 1, not a DDoS using my honeypot. No need to block UDP 5060.
+- The big Network Out peaks are on 2 to 5 Nov, which line up with the RDP brute force, the Alsycon scans and the VNC wave. That's the honeypots replying to a lot of incoming traffic, which is normal.
+- Screenshots: ../screenshots/investigations/azure-sentrypeer-91.110.167.131.png and azure-network-out-28oct-7nov.png
+
 ### 11. 194.50.16.198, a service scan from the Netherlands (31 Oct)
 - 71,715 log entries, all in one burst on the morning of 31 Oct. Network Alsycon B.V. in Amsterdam. Probably a big part of why the Netherlands is the number 2 country this week.
 - Unlike the Kazakhstan scanner it wasn't just touching ports. Suricata picked up HTTP and TLS on ports like 2404, 6579, 8083 and 5623, so it was checking what service runs on each port, not just if the port is open.
 - Port 2404 is normally used for industrial control systems (IEC 104), so it was looking for those too.
 - Screenshot: ../screenshots/investigations/azure-scan-194.50.16.198-31oct.png
+- GreyNoise (7 Nov): MALICIOUS, a hosting IP (Alsycon B.V., Amstelveen) tagged as a scanner, not spoofable, actor unknown, last seen 6 Nov. AbuseIPDB: 100% abuse confidence with 48,343 reports from 642 people, the latest 46 seconds before I looked. So it's one of the busiest bad scanners on the internet right now and it hits everyone, not just me.
+- Screenshot: ../screenshots/investigations/lookup-194.50.16.198-greynoise-abuseipdb.png
 
 ### 12. 77.83.240.70, the same kind of service scan on AWS (3 Nov)
 - AWS's top source IP for days 6 to 12 with 31,169. Same network as 194.50.16.198 (Alsycon B.V., AS 49870).
@@ -585,6 +597,9 @@ Kibana shows Azure week 2 as "2m" but the top 10 honeypots add up to about 1.79 
 - Prefixes this time were 7009, 8009, 9009 and 90009. It's a different North American number from the one it tried on Azure in week 1, but the same trick.
 - This time Suricata did alert: ET VOIP INVITE Message Flood UDP and GPL VOIP SIP INVITE message flooding, category Attempted Denial of Service. On Azure in week 1 it didn't raise a single alert for 8 hours. Not sure why yet, maybe it was faster this time and crossed the rule's rate limit.
 - I also covered the phone numbers in the old week 1 screenshot so neither number is in the repo.
+- GreyNoise (7 Nov): NOT OBSERVED, meaning it hasn't been seen mass scanning the whole internet in the last day. AbuseIPDB: 92% abuse confidence, 210 reports from 65 people, latest 14 hours before, 31173 Services AB in Frankfurt.
+- So unlike the Alsycon scanners, this one isn't spraying the whole internet. It goes after SIP servers it already knows about, and mine is on its list. Other people have still reported it, so I'm not the only target.
+- Screenshot: ../screenshots/investigations/lookup-185.213.155.236-greynoise-abuseipdb.png
 - Screenshot: ../screenshots/investigations/aws-tollfraud-185.213.155.236-week2.png
 
 ### 14. A VNC wave on Azure from Contabo servers (4 to 5 Nov)
@@ -600,7 +615,7 @@ Kibana shows Azure week 2 as "2m" but the top 10 honeypots add up to about 1.79 
 - 5,500 alerts in week 2, in two short bursts, one on the morning of 3 Nov and one just after midnight on 5 Nov. Dozens of alerts in the same second, so it's an automated tool firing lots of requests at once.
 - The alert metadata says the affected product is Fortigate and it's tagged CISA_KEV, which means it's on CISA's Known Exploited Vulnerabilities list. Real attackers use this one, it's not just old noise.
 - The MITRE techniques in the alert are T1083 File and Directory Discovery and T1082 System Information Discovery, since the bug lets you read files off the VPN like saved logins.
-- Still need the request path and the source IP. In Discover, add the src_ip and http.url columns.
+- Still need the request path and the source IP. In Discover, hover over src_ip and http.url in the field list and click the plus to add them as columns.
 - Screenshot: ../screenshots/investigations/aws-cve-2018-13379-week2.png
 
 ### Note on AWS monitoring
@@ -618,10 +633,11 @@ Kibana shows Azure week 2 as "2m" but the top 10 honeypots add up to about 1.79 
 - Check which honeypot 23.94.174.242 hit on Azure (on AWS it was Sentrypeer).
 - Find out why ewsposter keeps restarting on AWS.
 - Compare top attacker networks (AS) between Azure and AWS.
-- Check Azure Network Out on 29 Oct to see if the port 5060 flood was a SIP reflection.
 - Search 345gs5662d34 to see which botnet uses it.
 - Check what RDPHoneypot logged for 216.250.250.134 and its full network name.
-- Check the payloads behind the CVE-2018-13379 and CVE-2025-30208 alerts on AWS.
+- Check the payloads behind the CVE-2018-13379 and CVE-2025-30208 alerts on AWS (add src_ip and http.url columns).
+- UDP bytes in vs out per port in Lens (623 IPMI and 69 TFTP are the ones to check).
+- What caused the AWS Honeytrap spike on 28 Oct.
 - Fix the 185.213.155.236 range and see when the AWS toll fraud started.
 - Find who caused the VNC wave on Azure in week 2.
 - Look up 136.144.199.59 (Signet B.V., 101,821 on Azure week 2) and Banatsync Srl.
