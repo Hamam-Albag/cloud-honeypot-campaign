@@ -42,7 +42,7 @@ Keep public IPs, passwords and keys OUT of this file if it goes on GitHub.
   - The Network Out Total metric kept failing with InternalServerError, from the portal and the CLI, even with skipmetricvalidation (Activity ID c106f741-5775-43aa-b9dd-f8bd3903bec2). Microsoft.Insights was registered and a CPU alert worked fine, so it was only that metric. The older Network Out metric worked, and it's arguably better since it only counts traffic going out to the internet.
   - AWS: CloudWatch alarm honeypot-outbound-spike on NetworkOut (Sum over 5 minutes) over 5 MB, emailing me through an SNS topic. AWS's normal peaks over the week were about 3.3 MB. Left all EC2 actions off so an alarm can't stop the instance.
 - 6 Nov: Switching from check ins every few days to weekly reports. Each week runs Thursday 10:32 to Thursday 10:32 (from when AWS went live) and both clouds use the exact same window, so the comparisons are fair. The earlier check ins stay as they are. Running totals (days 1 to N) are dropped since they're just the windows added up, and the month summary covers that at the end.
-- 7 Nov: Had a quick look at credit. Both clouds have roughly $70 left, but I only glanced at it. Need to write down the exact numbers at the next weekly report, since Azure for Students disables the VM when the credit runs out.
+- 7 Nov: Credit check. Azure has spent $29.47 and AWS $20.09 so far, about 17 days in. That's roughly $1.70 a day on Azure and $1.25 a day on AWS, so the full month should come to about $55 on Azure and $40 on AWS. Both are well inside the credit, so there's no risk of the VMs being shut off before 21 Nov.
 
 ## Check-ins
 
